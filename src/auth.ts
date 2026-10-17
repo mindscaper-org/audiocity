@@ -183,7 +183,10 @@ export class Authentication implements AuthService {
 			const refresh = requiredString(body.refresh_token, 'refresh_token', 200);
 			return this.db.transaction(() => {
 				const row = this.db.get<TokenRow>('SELECT * FROM auth_tokens WHERE refresh_hash = ? AND refresh_expires > ?', digest(refresh), now());
-				if (!row || row.client_id !== client.id) throw new ApiError(401, 'Invalid refresh token.', 'Unauthorized');
+				if (!row || row.client_id !== client.id) {
+					// Audacity clears a rejected stored refresh token only after HTTP 422.
+					throw new ApiError(client.legacy ? 422 : 401, 'Invalid refresh token.', client.legacy ? 'ValidationError' : 'Unauthorized');
+				}
 				const scope = scopeValue(body.scope, row.scope);
 				if (row.scope !== 'all' && scope.split(' ').some(item => !row.scope.split(' ').includes(item))) throw new ApiError(422, 'Refresh cannot expand scope.');
 				this.db.run('DELETE FROM auth_tokens WHERE id = ?', row.id);

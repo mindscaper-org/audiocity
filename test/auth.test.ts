@@ -77,6 +77,53 @@ void test('refresh rotates both tokens and logout revokes the session', async ()
 	} finally { await f.close(); }
 });
 
+for (const invalidation of ['expiry', 'logout', 'password change']) void test(`Audacity receives the terminal refresh response after ${invalidation}`, async () => {
+	const f = await fixture();
+	try {
+		const client = { client_id: f.config.audacityClientId, client_secret: f.config.audacityClientSecret };
+		const tokens = (await f.login(client)).json<{ access_token: string; refresh_token: string }>();
+		const headers = { authorization: `Bearer ${tokens.access_token}` };
+		if (invalidation === 'expiry') f.db.run('UPDATE auth_tokens SET refresh_expires=1');
+		else if (invalidation === 'logout') assert.equal((await f.app.inject({ method: 'POST', url: '/auth/logout', headers })).statusCode, 204);
+		else assert.equal((await f.app.inject({ method: 'POST', url: '/auth/password', headers,
+			payload: { current_password: f.config.adminPassword, new_password: 'replacement desktop password' } })).statusCode, 204);
+		const result = await f.app.inject({ method: 'POST', url: '/auth/token', payload: {
+			...client, grant_type: 'refresh_token', refresh_token: tokens.refresh_token, scope: ''
+		} });
+		assert.equal(result.statusCode, 422, result.body);
+		assert.equal(result.json<{ access_token?: string }>().access_token, undefined);
+	} finally { await f.close(); }
+});
+
+void test('Audacity refresh compatibility preserves client credentials and refresh-token isolation', async () => {
+	const f = await fixture();
+	try {
+		const desktop = { client_id: f.config.audacityClientId, client_secret: f.config.audacityClientSecret };
+		const publicClient = await registerClient(f);
+		const grant = await authorize(f, publicClient);
+		const exchange = await f.app.inject({ method: 'POST', url: '/auth/token', payload: {
+			grant_type: 'authorization_code', client_id: publicClient.id, code: grant.code, code_verifier: grant.verifier, redirect_uri: publicClient.redirect
+		} });
+		assert.equal(exchange.statusCode, 200);
+		const browser = exchange.json<{ refresh_token: string }>();
+		const consoleTokens = (await f.login()).json<{ refresh_token: string }>();
+		const native = (await f.login(desktop)).json<{ refresh_token: string }>();
+		const refresh = (refresh_token: string, client: Record<string, string> = {}) => f.app.inject({ method: 'POST', url: '/auth/token',
+			payload: { grant_type: 'refresh_token', refresh_token, scope: '', ...client } });
+		assert.equal((await refresh(native.refresh_token, { ...desktop, client_secret: 'wrong' })).statusCode, 401);
+		assert.equal((await refresh(native.refresh_token, { client_id: publicClient.id })).statusCode, 401);
+		for (const token of [browser.refresh_token, consoleTokens.refresh_token]) assert.equal((await refresh(token, desktop)).statusCode, 422);
+		assert.equal((await refresh(browser.refresh_token, { client_id: publicClient.id })).statusCode, 200);
+		assert.equal((await refresh(consoleTokens.refresh_token)).statusCode, 200);
+		const rotated = await refresh(native.refresh_token, desktop);
+		assert.equal(rotated.statusCode, 200);
+		assert.equal((await refresh(native.refresh_token, desktop)).statusCode, 422, 'a rotated desktop token must receive the terminal response too');
+		assert.equal((await refresh(rotated.json<{ refresh_token: string }>().refresh_token, desktop)).statusCode, 200);
+		assert.equal((await refresh('invalid-browser-token', { client_id: publicClient.id })).statusCode, 401);
+		assert.equal((await refresh('invalid-console-token')).statusCode, 401);
+	} finally { await f.close(); }
+});
+
 void test('registration is closed by default and only administrators can create users', async () => {
 	const f = await fixture();
 	try {
