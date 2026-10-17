@@ -103,7 +103,11 @@ export async function registerProjectRoutes(app: FastifyInstance, ctx: Context):
 		if (project.synced_id === snapshot.id || (project.head_id === snapshot.id && snapshot.synced) || ctx.db.get('SELECT id FROM snapshots WHERE project_id=? AND (parent_id=? OR previous_head_id=?)', project.id, snapshot.id, snapshot.id)) throw new ApiError(409, 'A current synchronized snapshot or ancestor cannot be deleted.', 'ProjectVersionConflict');
 		ctx.db.transaction(() => {
 			ctx.db.run('DELETE FROM snapshots WHERE id=?', snapshot.id);
-			if (project.head_id === snapshot.id) ctx.db.run('UPDATE projects SET head_id=?,updated=? WHERE id=?', snapshot.previous_head_id || project.synced_id, now(), project.id);
+			if (project.head_id === snapshot.id) {
+				const previousHead = snapshot.previous_head_id || project.synced_id;
+				if (previousHead) ctx.db.run('UPDATE projects SET head_id=?,updated=? WHERE id=?', previousHead, now(), project.id);
+				else ctx.db.run('DELETE FROM projects WHERE id=?', project.id);
+			}
 		});
 		await ctx.blobs.remove(snapshot.file_id); await ctx.blobs.remove(snapshot.mixdown_id);
 		await collectUnusedBlocks(ctx, user.id);

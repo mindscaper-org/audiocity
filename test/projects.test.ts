@@ -148,6 +148,30 @@ await test('deleting active snapshots is guarded while deleting an abandoned hea
 	assert.equal((await f.app.inject({ url: root, headers: auth(f.token) })).statusCode, 404);
 });
 
+await test('deleting the only pending snapshot removes its empty project and retires its upload capabilities', async (t) => {
+	const f = await fixture(); t.after(() => f.cleanup());
+	let nativeId = '';
+	for (const format of ['audacity', 'aup4']) {
+		const response = await f.app.inject({ method: 'POST', url: '/project', headers: auth(f.token), payload: { name: 'Cancelled initial save', format, blocks: format === 'audacity' ? ['abandoned'] : [] } });
+		assert.equal(response.statusCode, format === 'audacity' ? 200 : 201, response.body);
+		const created = response.json<Created>();
+		if (format === 'audacity') nativeId = created.project.id;
+		const root = `/project/${created.project.id}`;
+		assert.equal((await f.app.inject({ method: 'DELETE', url: `${root}/snapshot/${created.snapshot.id}`, headers: auth(f.token) })).statusCode, 204);
+		assert.equal((await f.app.inject({ url: root, headers: auth(f.token) })).statusCode, 404);
+		assert.equal((await f.app.inject({ method: 'POST', url: `${root}/snapshot`, headers: auth(f.token), payload: { blocks: [] } })).statusCode, 404);
+		const list = await f.app.inject({ url: '/project?transport=all', headers: auth(f.token) });
+		assert.deepEqual(list.json<Listed<Snapshot>>().items, []);
+		for (const descriptor of [created.sync.file, created.sync.mixdown, ...created.sync.blocks]) {
+			assert.equal((await f.app.inject({ method: 'PUT', url: path(descriptor.url), headers: { 'content-type': 'application/octet-stream' }, payload: Buffer.from('cancelled bytes') })).statusCode, 409);
+		}
+	}
+	const fresh = await f.app.inject({ method: 'POST', url: '/project', headers: auth(f.token), payload: { blocks: ['abandoned'] } });
+	assert.equal(fresh.statusCode, 200, fresh.body);
+	assert.notEqual(fresh.json<Created>().project.id, nativeId, 'a cancelled native project ID is not reused');
+	assert.equal((await complete(f, fresh.json<Created>())).statusCode, 204);
+});
+
 await test('archive validation rejects arbitrary bytes and native transport switches', async (t) => {
 	const f = await fixture(); t.after(() => f.cleanup());
 	const createdResponse = await f.app.inject({ method: 'POST', url: '/project', headers: auth(f.token), payload: { name: 'Validate', format: 'aup4' } });

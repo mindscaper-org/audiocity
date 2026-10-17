@@ -71,7 +71,7 @@ Audiocity sends `Connection: close` on POST responses to work around Audacity 3.
 - PATCH `/project/PROJECT_ID` changes `name` or `details`.
 - GET `/project/PROJECT_ID/snapshot` lists revisions, including pending ones, with the same pagination.
 - GET `/project/PROJECT_ID/snapshot/SNAPSHOT_ID?expand=blocks,file_url` returns snapshot metadata and signed download URLs for confirmed metadata and blocks. Downloads preserve the original bytes.
-- DELETE `/project/PROJECT_ID/snapshot/SNAPSHOT_ID` removes an abandoned revision. A current synchronized revision or ancestor of another revision cannot be removed. Removing a pending head restores its predecessor.
+- DELETE `/project/PROJECT_ID/snapshot/SNAPSHOT_ID` removes an abandoned revision. A current synchronized revision or ancestor of another revision cannot be removed. Removing a pending head restores its predecessor. Cancelling the only pending revision also removes its empty project.
 - DELETE `/project/PROJECT_ID` removes the complete project history and its blobs. Blocks still referenced by the same owner's other projects remain available.
 
 The head may be pending. `latest_synced_snapshot_id` identifies the latest completed revision suitable for download, and `latest_synced_format` identifies that revision's format (empty before any revision completes). The top-level `format` describes the head, which may select a different archive generation from the last completed revision. Clients should retain local work until completion succeeds.
