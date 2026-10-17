@@ -91,7 +91,7 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 	async function create(request: FastifyRequest) {
 		const user = owner(request);
 		const body = objectBody(request.body);
-		if (request.routeOptions.url === '/v1/audio/create') requiredString(body.category, 'category', 32);
+		if (request.routeOptions.url === '/v1/audio/create') requiredString(body.category, 'category', 64);
 		const mime = requiredString(body.mime, 'mime', 100);
 		audioFormat(mime);
 		if (!Number.isSafeInteger(body.size) || Number(body.size) < 1 || Number(body.size) > ctx.config.maxUploadBytes) {

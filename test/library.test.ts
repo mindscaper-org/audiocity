@@ -73,6 +73,24 @@ void test('metadata options include default categories and all CC licenses; only
 	} finally { await f.cleanup(); }
 });
 
+void test('public audio uploads accept administrator-defined category IDs up to the supported limit', async () => {
+	const f = await fixture();
+	try {
+		const category = `field-${'recording'.repeat(6)}-sfx`;
+		assert.equal(category.length, 64);
+		const created = await f.app.inject({ method: 'POST', url: '/admin/categories', headers: auth(f.token), payload: { id: category, name: 'Field recordings' } });
+		assert.equal(created.statusCode, 201, created.body);
+		const response = await f.app.inject({ method: 'POST', url: '/v1/audio/create', headers: auth(f.token), payload: {
+			mime: 'audio/flac', size: bytes.length, name: 'Rain.flac', category,
+		} });
+		assert.equal(response.statusCode, 201, response.body);
+		const policy = response.json<Policy>();
+		await upload(f.app, policy, bytes, 'audio/flac');
+		const item = (await f.app.inject({ url: `/library/audio/${policy.audio.id}`, headers: auth(f.token) })).json<Audio>();
+		assert.equal(item.category, category);
+	} finally { await f.cleanup(); }
+});
+
 void test('batch metadata edits validate every row, enforce ownership, and allow atomic slug swaps', async () => {
 	const f = await fixture();
 	try {
