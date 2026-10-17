@@ -56,9 +56,9 @@ export const consoleLibrary = String.raw`
 		const search = node('form'); search.setAttribute('role', 'search'); const query = field(search, 'Search audio', 'search', audioQuery);
 		const searchButton = node('button', 'Search'); searchButton.type = 'submit'; search.append(searchButton);
 		on(search, 'submit', async () => { audioQuery = query.value.trim(); await audioList(); }); toolbar.append(search); panel.append(toolbar);
-		const shared = field(panel, 'Include shared files in Audacity', 'checkbox'); shared.checked = preference.include_shared;
-		const hint = node('p', 'Controls whether shared files appear in Audacity’s audio browser. Your uploads are always included.'); hint.className = 'hint'; panel.append(hint);
-		on(shared, 'change', async () => { shared.disabled = true; try { await api('/library/preferences', 'PATCH', { include_shared: shared.checked }); tell('Audacity library preference saved.'); } catch (error) { shared.checked = !shared.checked; throw error; } finally { shared.disabled = false; } });
+		const shared = field(panel, 'Include shared files in my library', 'checkbox'); shared.checked = preference.include_shared;
+		const hint = node('p', 'Choose whether your browser library includes shared recordings by default. Audacity lists your uploads.'); hint.className = 'hint'; panel.append(hint);
+		on(shared, 'change', async () => { shared.disabled = true; try { await api('/library/preferences', 'PATCH', { include_shared: shared.checked }); tell('Library preference saved.'); } catch (error) { shared.checked = !shared.checked; throw error; } finally { shared.disabled = false; } });
 		if (!result.items.length) panel.append(node('p', audioQuery ? 'No audio matches this search.' : audioSource === 'mine' ? 'No audio yet. Use + Upload to add a recording.' : 'No shared audio on this page.'));
 		for (const item of result.items) {
 			const article = card(item.title, item.status + ' · ' + (item.origin === 'shared-folder' ? 'shared folder' : item.visibility) + ' · ' + item.source.size.toLocaleString() + ' bytes', panel);

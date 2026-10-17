@@ -10,7 +10,7 @@ Implemented:
 - Complete AUP3/AUP4 file revisions for clients such as Soundscaper, preserving the uploaded SQLite file byte for byte.
 - One library with Audio and Projects tabs, a header **+ Upload** action for audio and AUP3/AUP4 files, and dedicated audio playback and metadata pages.
 - Client-side WavPack playback, including Audacity's lossless uploads. Originals stay unchanged; the browser loads its decoder only when needed.
-- A shared library combining a configured server directory with public uploads, with a persistent per-user switch to exclude shared files from Audacity's listings.
+- A shared browser library combining a configured server directory with public uploads, with a persistent per-user default for including shared files. Native Audacity lists retain owned uploads.
 - Administrator-managed categories, tags, descriptions, slugs, licenses, and a spreadsheet-style **Manage files** page for bulk metadata editing. See the [library guide](docs/library.md).
 - Native project audio previews and project archive downloads. Audacity's **Update Cloud Audio Preview** supplies native project previews; older previews are labeled when a later save has no mixdown.
 

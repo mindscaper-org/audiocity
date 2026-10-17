@@ -39,17 +39,18 @@ success callback confirms it. Failed or incomplete uploads cannot be shared.
 
 ## Library operations
 
-All `/v1/audio/*` operations require a bearer token with audio access. Mutations
-remain owner-only. Native listings also include shared recordings when the
-account's `include_shared` preference is enabled. IDs may be UUIDs or
+All `/v1/audio/*` operations require a bearer token with audio access and act only
+on the authenticated user's recordings. Native `/my/audio` listings also contain
+only that user's uploads. Browse shared recordings through the explicit browser
+library API. IDs may be UUIDs or
 `slug:your-audio-slug` for the owner's library; folder recordings use stable
 `shared-…` IDs. The console uses the explicit [library API](library-api.md) for
 source selection, categories, preferences and transactional metadata batches.
 
 | Method and path | Behavior |
 | --- | --- |
-| `GET /v1/audio/list` | Array of owned recordings, including pending uploads, plus shared recordings according to the account preference |
-| `GET /v1/audio/view?id=…` | Metadata for an owned or accessible shared recording |
+| `GET /v1/audio/list` | Array of owned recordings, including pending uploads |
+| `GET /v1/audio/view?id=…` | Metadata for an owned recording |
 | `PATCH /v1/audio/update?id=…` | Edit title, slug, category, description, tags, license, visibility, or download permission |
 | `POST /v1/audio/delete?id=…` | Delete owned metadata and source bytes; returns `204` |
 

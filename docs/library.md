@@ -22,6 +22,6 @@ Choose **Manage files** for the metadata table. Select a cell or a rectangle wit
 
 The shared view combines ready public uploads from other users with audio from the configured `AUDIOCITY_SHARED_DIR`. Public uploads remain owned by their uploader. Folder recordings can be described and categorized by administrators without rewriting the source files. Private and unlisted recordings are not included in the shared view.
 
-Each account can turn **Include shared files** off to keep shared recordings out of its default library and native Audacity file lists. This preference persists on the server, so it also applies to that account's editor sessions. The library's source selector lets you explicitly browse your files, shared files, or both.
+Each account can turn **Include shared files in my library** off to show only its own uploads by default in the browser library. This preference persists on the server. The library's source selector lets you explicitly browse your files, shared files, or both. Native Audacity lists and the public audio library API contain owned uploads, so editors can safely build account-scoped recording links. Public API search discovers listed uploads across accounts independently of this browser preference.
 
 See [library API and directory configuration](library-api.md) for server setup, indexing, permissions and API details. The directory must be accessible inside the container; a Windows folder can be mounted through its WSL `/mnt/c/...` path. The configured path is the path inside the container, not the Windows drive-letter path.

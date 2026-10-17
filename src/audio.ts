@@ -150,8 +150,7 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 	app.get('/v1/search', { config: { rateLimit: {
 		max: 60, timeWindow: '1 minute', keyGenerator: request => owner(request).id,
 	} } }, async request => {
-		const user = owner(request);
-		await shared.scan();
+		owner(request);
 		const query = objectBody(request.query);
 		const search = query.query ?? '';
 		const types = query.types ?? '';
@@ -169,21 +168,20 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 			: `(audio.title LIKE ? ESCAPE '\\' OR audio.description LIKE ? ESCAPE '\\' OR users.name LIKE ? ESCAPE '\\'
 				OR EXISTS (SELECT 1 FROM json_each(audio.tags) WHERE value LIKE ? ESCAPE '\\'))`;
 		const params = term.startsWith('#') ? [term.slice(1)] : [pattern, pattern, pattern, pattern];
-		const scope = includeShared(user) ? sourceWhere(user, 'shared') : { sql: "(origin='upload' AND audio.owner_id=? AND visibility='public' AND blob_id IN (SELECT id FROM blobs WHERE state='ready'))", values: [user.id] };
 		const rows = ctx.db.all<AudioRecord>(`SELECT audio.* FROM audio LEFT JOIN users ON users.id=audio.owner_id
-			WHERE ${scope.sql} AND ${matching}
-			ORDER BY audio.created DESC,audio.rowid DESC LIMIT 10 OFFSET ?`, ...scope.values, ...params, (Number(pageValue) - 1) * 10);
+			WHERE origin='upload' AND visibility='public' AND blob_id IN (SELECT id FROM blobs WHERE state='ready') AND ${matching}
+			ORDER BY audio.created DESC,audio.rowid DESC LIMIT 10 OFFSET ?`, ...params, (Number(pageValue) - 1) * 10);
 		return rows.map(row => ({ type: 'audio', model: metadata(row, false, undefined, true) }));
 	});
 
 	async function list(request: FastifyRequest, legacy: boolean, library = false) {
 		const user = owner(request);
-		await shared.scan();
+		if (library) await shared.scan();
 		const query = objectBody(request.query);
 		const { page, perPage, search } = pageQuery(legacy || library ? query : { 'per-page': 50, ...query });
 		const sort = query.sort ?? 'newest';
 		if (typeof sort !== 'string' || !['newest', 'oldest', 'az'].includes(sort)) throw new ApiError(422, 'sort must be newest, oldest, or az.', 'ValidationError');
-		const source = library && query.source !== undefined ? query.source : includeShared(user) ? 'all' : 'mine';
+		const source = library ? query.source ?? (includeShared(user) ? 'all' : 'mine') : 'mine';
 		if (typeof source !== 'string' || !['mine', 'shared', 'all'].includes(source)) throw new ApiError(422, 'source must be mine, shared, or all.', 'ValidationError');
 		const where = sourceWhere(user, source);
 		const order = sort === 'az' ? 'title COLLATE NOCASE ASC,id ASC' : `created ${sort === 'oldest' ? 'ASC' : 'DESC'},rowid ${sort === 'oldest' ? 'ASC' : 'DESC'}`;
@@ -277,13 +275,7 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 	});
 	app.get('/v1/audio/view', request => {
 		const user = owner(request); const id = queryId(request);
-		let row: AudioRecord;
-		try { row = find(id, user.id); }
-		catch (error) {
-			row = find(id);
-			if (!(row.origin === 'shared-folder' || row.visibility === 'public' && ctx.blobs.ready(row.blob_id))) throw error;
-		}
-		return metadata(row, false, user, true);
+		return metadata(find(id, user.id), false, user, true);
 	});
 	app.get<{ Params: { id: string } }>('/audio/:id', request => metadata(visible(request, request.params.id)));
 	app.get<{ Params: { id: string } }>('/public/audio/:id', request => {

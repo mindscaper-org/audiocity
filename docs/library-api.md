@@ -12,7 +12,7 @@ Owners can `PATCH /library/audio/:id`. Administrators can edit folder entries' m
 
 Licenses are `none` (No license selected), `arr` (All rights reserved), `cc-0` (CC0 1.0), and the six Creative Commons 4.0 licenses: `cc-by`, `cc-by-sa`, `cc-by-nc`, `cc-by-nc-sa`, `cc-by-nd`, and `cc-by-nc-nd`. An explicit `none` value is preserved through edits and restarts. API uploads default to `none`; browser uploads explicitly select `arr`.
 
-`GET/PATCH /library/preferences` reads or changes `{ "include_shared": true }` for the signed-in user. It defaults to true. Turning it off hides shared audio from default browser and native Audacity lists/search, while explicit browser `source=shared` and existing playback links still work.
+`GET/PATCH /library/preferences` reads or changes `{ "include_shared": true }` for the signed-in user. It defaults to true. Turning it off hides shared audio from the default browser library, while explicit browser `source=shared` and existing playback links still work. Native `/my/audio` and public `/v1/audio/list` always list only the account's uploads; public search always searches ready listed uploads across accounts and excludes server-folder files.
 
 ## Configure an existing shared folder
 

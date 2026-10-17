@@ -24,7 +24,7 @@ async function audio(f: Awaited<ReturnType<typeof fixture>>, token: string, fiel
 	return policy.audio;
 }
 
-void test('shared library includes ready public uploads, preserves private boundaries, and remembers native inclusion per account', async () => {
+void test('shared library includes ready public uploads, preserves private boundaries, and remembers browser inclusion per account', async () => {
 	const f = await fixture();
 	try {
 		const other = await createUser(f.app, f.token);
@@ -37,14 +37,14 @@ void test('shared library includes ready public uploads, preserves private bound
 		assert.deepEqual(list.items.map(row => row.id).sort(), [mine.id, published.id].sort());
 		assert.equal(list.items.find(row => row.id === mine.id)?.can_edit, true);
 		assert.equal(list.items.find(row => row.id === published.id)?.can_edit, false);
-		assert.equal((await f.app.inject({ url: `/v1/audio/view?id=${published.id}`, headers: auth(f.token) })).statusCode, 200);
+		assert.equal((await f.app.inject({ url: `/v1/audio/view?id=${published.id}`, headers: auth(f.token) })).statusCode, 404);
 		const set = await f.app.inject({ method: 'PATCH', url: '/library/preferences', headers: auth(f.token), payload: { include_shared: false } });
 		assert.deepEqual(set.json(), { include_shared: false });
 		for (const url of ['/library/audio', '/my/audio', '/v1/audio/list']) {
 			const result = (await f.app.inject({ url, headers: auth(f.token) })).json<List | Audio[]>();
 			assert.deepEqual((Array.isArray(result) ? result : result.items).map(row => row.id), [mine.id]);
 		}
-		assert.equal((await f.app.inject({ url: '/v1/search?query=rain', headers: auth(f.token) })).json<Audio[]>().length, 0);
+		assert.equal((await f.app.inject({ url: '/v1/search?query=rain', headers: auth(f.token) })).json<Audio[]>().length, 1);
 		assert.deepEqual((await f.app.inject({ url: '/library/audio?source=shared', headers: auth(f.token) })).json<List>().items.map(row => row.id), [published.id]);
 		assert.deepEqual((await f.app.inject({ url: '/library/preferences', headers: auth(other.token) })).json(), { include_shared: true });
 		assert.equal((await f.app.inject({ method: 'PATCH', url: '/library/preferences', headers: auth(f.token), payload: { include_shared: 'false' } })).statusCode, 422);
@@ -160,7 +160,8 @@ void test('existing shared directory is indexed without copying originals; signe
 		assert.equal(edited.title, 'Forest rain'); assert.equal(edited.slug, 'forest-rain'); assert.equal(edited.can_edit, true);
 		assert.deepEqual(await readFile(join(directory, 'nested', 'Rain.flac')), bytes);
 		assert.equal(f.ctx.db.get<{ count: number }>('SELECT count(*) count FROM blobs')?.count, 0);
-		assert.equal((await f.app.inject({ url: '/v1/search?query=forest', headers: auth(other.token) })).json<{ model: Audio }[]>()[0]?.model.id, item.id);
+		assert.deepEqual((await f.app.inject({ url: '/v1/search?query=forest', headers: auth(other.token) })).json(), []);
+		assert.equal((await f.app.inject({ url: '/library/audio?source=shared&q=forest', headers: auth(other.token) })).json<List>().items[0]?.id, item.id);
 		await writeFile(join(directory, 'nested', 'Rain.flac'), Buffer.from('fLaCreplaced-more-bytes'));
 		await f.app.inject({ method: 'POST', url: '/admin/shared/rescan', headers: auth(f.token) });
 		assert.equal((await f.app.inject(relative(item.play.url))).statusCode, 403);

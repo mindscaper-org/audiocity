@@ -46,11 +46,13 @@ The Help menu uses a manual token dialog; a browser callback does not fill its T
 To switch back, unlink the Audiocity account, close Audacity, and restore your backed-up configuration (or remove the overridden entries to restore audio.com defaults), then restart and link your audio.com account again.
 
 The browser Library combines Audio and Projects tabs. **Include shared files in
-Audacity** controls whether your account's native audio browser lists the shared
-server directory and other users' public uploads. Turn it off for a smaller
-editor library; your own uploads remain listed. The preference persists across
-browser and editor sessions. See the [library guide](library.md) for uploads,
-WavPack playback, metadata editing and the shared source selector.
+my library** controls whether the browser library includes the shared server
+directory and other users' public uploads by default. Audacity's native audio
+browser uses the owner's uploads at `/my/audio`; shared-folder and other users'
+entries remain available in the browser console. Public API audio lists also
+contain the owner's uploads, while public search ignores this browser preference.
+See the [library guide](library.md) for uploads, WavPack playback, metadata editing
+and the shared source selector.
 
 Change all relevant origins together. The browser-link, post-upload, tour, and authenticated browser-redirect defaults also point at audio.com; changing only the API origin is insufficient. In particular, Audacity's browser-session redirect carries a token and must point to your server.
 

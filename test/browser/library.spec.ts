@@ -60,14 +60,14 @@ test('mixed uploads use library tabs, edit pages, shared preferences and public 
 	await expect(page.getByRole('heading', { name: 'Batch project', exact: true })).toBeVisible();
 	await page.getByRole('tab', { name: 'Audio', exact: true }).click();
 	await expect(page.getByRole('heading', { name: 'Shared ambience', exact: true })).toBeVisible();
-	await page.getByLabel('Include shared files in Audacity').uncheck();
+	await page.getByLabel('Include shared files in my library').uncheck();
 	await expect(page.locator('#message')).toContainText('preference saved');
 	await page.reload();
-	await expect(page.getByLabel('Include shared files in Audacity')).not.toBeChecked();
+	await expect(page.getByLabel('Include shared files in my library')).not.toBeChecked();
 	const native = await request.get('/my/audio', { headers: { authorization: `Bearer ${token}` } });
 	const nativeItems = await native.json() as { items: { title: string }[] };
 	expect(nativeItems.items.some(item => item.title === 'Shared ambience')).toBe(false);
-	await page.getByLabel('Include shared files in Audacity').check();
+	await page.getByLabel('Include shared files in my library').check();
 	await page.getByLabel('Files', { exact: true }).selectOption('mine');
 	await expect(page.getByRole('heading', { name: 'Shared ambience', exact: true })).toHaveCount(0);
 	await page.getByRole('link', { name: 'Batch recording', exact: true }).click();
