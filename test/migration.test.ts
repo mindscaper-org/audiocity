@@ -48,9 +48,10 @@ await test('resuming at the same origin preserves active upload capabilities', a
 	const created = (await f.app.inject({ method: 'POST', url: '/project', headers: auth(f.token), payload: { name: 'Stable', blocks: ['pending'] } })).json<Created>();
 	const base = `/project/${created.project.id}/snapshot/${created.snapshot.id}/sync`;
 	const resumed = (await f.app.inject({ url: base, headers: auth(f.token) })).json<Created['sync']>();
-	assert.deepEqual(resumed, created.sync);
+	const expected = { ...created.sync, blocks: created.sync.blocks.map(block => ({ ...block, id: block.id.toUpperCase() })) };
+	assert.deepEqual(resumed, expected);
 	const again = (await f.app.inject({ url: base, headers: auth(f.token) })).json<Created['sync']>();
-	assert.deepEqual(again, created.sync);
+	assert.deepEqual(again, expected);
 	await upload(f.app, created.sync.file, Buffer.from('stable metadata'));
 	await upload(f.app, created.sync.blocks[0]!, Buffer.from('stable block'));
 	assert.equal((await f.app.inject({ method: 'POST', url: base, headers: auth(f.token) })).statusCode, 204);

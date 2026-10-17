@@ -89,7 +89,7 @@ export async function registerProjectRoutes(app: FastifyInstance, ctx: Context):
 	});
 	app.get('/project/:projectId/snapshot/:snapshotId/sync', (request) => {
 		const user = ctx.auth.requireUser(request, 'projects'); const project = getProject(ctx, user, ids(request).projectId);
-		return syncState(ctx, project, getSnapshot(ctx, project, ids(request).snapshotId), true);
+		return syncState(ctx, project, getSnapshot(ctx, project, ids(request).snapshotId), true, 'upper');
 	});
 	app.post('/project/:projectId/snapshot/:snapshotId/sync', (request, reply) => {
 		const user = ctx.auth.requireUser(request, 'projects'); const project = getProject(ctx, user, ids(request).projectId);

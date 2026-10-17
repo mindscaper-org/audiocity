@@ -69,7 +69,7 @@ function replaceFailedBlock(ctx: Context, block: BlockRow): BlockRow {
 	return row;
 }
 
-export function syncState(ctx: Context, project: ProjectRow, snapshot: SnapshotRow, renew = false) {
+export function syncState(ctx: Context, project: ProjectRow, snapshot: SnapshotRow, renew = false, blockIdCase: 'lower' | 'upper' = 'lower') {
 	if (renew) {
 		for (const field of ['file', 'mixdown'] as const) {
 			const id = snapshot[`${field}_id`]; const old = ctx.blobs.get(id);
@@ -90,7 +90,7 @@ export function syncState(ctx: Context, project: ProjectRow, snapshot: SnapshotR
 		mixdown: renew && ctx.blobs.ready(snapshot.mixdown_id) ? { id: snapshot.mixdown_id, url: '', success: '', fail: '' } : descriptor(snapshot.mixdown_upload),
 		blocks: missing.map((block) => {
 			const current = renew ? replaceFailedBlock(ctx, block) : block;
-			return { ...descriptor(current.upload), id: current.hash.toLowerCase() };
+			return { ...descriptor(current.upload), id: blockIdCase === 'upper' ? current.hash.toUpperCase() : current.hash.toLowerCase() };
 		}),
 	};
 }

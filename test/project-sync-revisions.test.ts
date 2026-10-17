@@ -124,7 +124,7 @@ for (const completed of [false, true]) await test(`sync recovers a ${completed ?
 	assert.equal(incomplete.json<{ name: string }>().name, 'UploadIncomplete');
 	const resumedSync = (await f.app.inject({ url: `${root}/sync`, headers })).json<Created['sync']>();
 	assert.equal(resumedSync.file.url, '', 'the original confirmed metadata is retained');
-	assert.deepEqual(resumedSync.blocks.map(block => block.id), [shared.id]);
+	assert.deepEqual(resumedSync.blocks.map(block => block.id), [shared.id.toUpperCase()]);
 	await upload(f.app, resumedSync.blocks[0]!, Buffer.from(`preserved local bytes for ${shared.id}`));
 	assert.equal((await f.app.inject({ method: 'POST', url: `${root}/sync`, headers })).statusCode, 204);
 	const response = await f.app.inject({ url: root, headers });

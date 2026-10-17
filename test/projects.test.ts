@@ -79,7 +79,7 @@ await test('GET sync resumes only missing blocks and stale completion never repl
 	await upload(f.app, first.sync.blocks[0]!, Buffer.from('block'));
 	const resumeUrl = `/project/${first.project.id}/snapshot/${first.snapshot.id}/sync`;
 	const resume = await f.app.inject({ url: resumeUrl, headers: auth(f.token) });
-	assert.deepEqual(resume.json<Created['sync']>().blocks.map((block: UploadDescriptor) => block.id), ['b']);
+	assert.deepEqual(resume.json<Created['sync']>().blocks.map((block: UploadDescriptor) => block.id), ['B']);
 	assert.equal(resume.json<Created['sync']>().file.url, '');
 	const newer = await create(`/project/${first.project.id}/snapshot`, { head_snapshot_id: first.snapshot.id, blocks: [] });
 	assert.equal((await complete(f, newer)).statusCode, 204);
