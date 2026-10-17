@@ -6,29 +6,48 @@ OAuth clients and consent belong to the selected server. It does not implement
 every audio.com product endpoint.
 
 The public contract is audio.com's [OpenAPI document](https://api.audio.com/v1/openapi.json),
-checked on 2026-10-15. Native project behavior was additionally compared with
-authenticated audio.com tests on that date and Audacity source pinned in
-[project-protocol.md](project-protocol.md). `test/audio-com-parity.test.ts` records
-regressions for the concrete differences found in that comparison:
+checked again on 2026-10-17. Native project behavior was compared with
+authenticated audio.com tests on 2026-10-15 and the released Audacity
+[3.7.9](https://github.com/audacity/audacity/tree/86d74c770974b25188ca2f23bcce47c1181bd08a)
+and [4.0.1](https://github.com/audacity/audacity/tree/d82386ce31175f1641d0450566a73a993c635a75)
+source. The parity, native upload/resume/cancellation, and public audio tests
+record regressions for the concrete differences found in those comparisons:
 
 - Native project/snapshot creation returns 200 with `project`, `snapshot`, and
   `sync`. Native completion returns 204 with no body, including repeat completion.
-- Native descriptors and downloaded block hashes use lowercase; differently cased
-  hashes reuse the same owner's block, including records written before this fix.
+- Native creation descriptors and downloaded block hashes use lowercase; GET
+  snapshot `/sync` uses uppercase IDs to match Audacity's persisted pending-block
+  lookup. Block reuse remains case-insensitive within an owner. Upload URLs expose
+  `X-Amz-Date` and `X-Amz-Expires` for Audacity's cached-URL expiry check, while
+  the token remains the upload credential.
 - `public all` is confined to public routes; a refresh narrowing to `all` permits
   native project access. User-agent impersonation is unnecessary.
 - Public audio creation requires `mime`, `size`, and `category`; its omitted
   `is_listed` defaults to unlisted. A ready unlisted recording is accessible by its
   direct URL and absent from search. Existing private uploads remain private.
 - The public audio library defaults to pages of 50. Search uses pages of ten.
-- OAuth expiry comes from the configured provider; a one-year response is valid.
+- Invalid or expired refresh tokens return 422 for the configured Audacity client,
+  which uses that status to unlink a dead session. OAuth expiry comes from the
+  configured provider; a one-year response is valid.
+- Legacy `/audio` upload policies include `extra.token`; Audacity's token-scoped
+  `DELETE /audio/ID?token=...` discard removes pending or completed uploads and
+  releases their storage reservation.
+- Cancelling a native project's first revision keeps its stable project ID for a
+  subsequent save. Empty native identities stay out of project list results; whole-file
+  archive cancellation can remove the empty archive project.
+- Public audio responses use `voice-over` and `sound-design` category IDs and
+  preserve the distinct `none` license, which is also the default for API uploads.
+  Library-only custom categories serialize as `other` in the public API and retain
+  their full category in `/library/audio`.
 
 Both servers use OAuth code flow with PKCE S256 for registered public clients,
 presigned PUT uploads followed by explicit success/failure hooks, owner-scoped
 library CRUD, and signed downloads supporting byte ranges. Capability URLs are
-opaque and must never receive the provider OAuth bearer token. Public audio view,
-update, and delete remain owner-only; search returns ready listed recordings
-across accounts.
+opaque and must never receive the provider OAuth bearer token. Public audio list,
+view, update, and delete remain owner-only; search returns ready listed uploads
+across accounts independently of browser shared-library preferences. Native
+`/my/audio` also contains owned uploads, matching Audacity 4's owner-scoped browser
+link construction.
 
 The native sync contract carries serialized metadata and WavPack blocks, not a
 complete AUP3 database. Audiocity accepts and returns these bytes without decoding
@@ -48,7 +67,8 @@ still require validation.
 
 Audiocity's browser playback adds a local WebAssembly decoder for WavPack
 originals. Its shared-library extension can include a configured server directory
-and other users' ready public uploads in native audio lists and search. Users can
-disable this inclusion persistently; explicit console source filters remain
-available. Audio editing and deletion stay owner-only, with administrators able
+and other users' ready public uploads through the browser and `/library/audio`
+extension. Users can choose its default inclusion persistently; explicit console
+source filters remain available. These shared-folder files are excluded from the
+audio.com-compatible list and search routes. Audio editing and deletion stay owner-only, with administrators able
 to edit metadata for server-directory recordings. See the [library API](library-api.md).

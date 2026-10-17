@@ -56,11 +56,45 @@ and the shared source selector.
 
 Change all relevant origins together. The browser-link, post-upload, tour, and authenticated browser-redirect defaults also point at audio.com; changing only the API origin is insufficient. In particular, Audacity's browser-session redirect carries a token and must point to your server.
 
-### Audacity 4: currently hardcoded
+### Audacity 4: select your server in Qt settings
 
-Audacity 4 currently hardcodes its cloud server endpoints. Editing Audacity 3's `audacity.cfg` does not change Audacity 4's server. Connecting Audacity 4 to Audiocity currently requires a custom build with its API, browser authorization, frontend and OAuth client values changed to match your server.
+Audacity 4.0.1 reads the same logical `CloudServices/AudioCom/` settings through its Qt settings backend. Its endpoints can be overridden without recompiling. Editing Audacity 3's `audacity.cfg` does not update that backend. These instructions follow the inspected 4.0.1 source and Qt's storage rules; an Audacity 4 desktop session against Audiocity has not been tested here.
 
-Audiocity supports the inspected Audacity 4 authentication contracts: password sign-in at `/auth/token`, optional registration at `/auth/register`, and OAuth with an ephemeral `http://127.0.0.1:PORT/` callback. That server-side compatibility does not provide a server selector in Audacity 4. See [authentication compatibility](authentication.md#audacity-authentication-compatibility) for details.
+Unlink the current account, close Audacity, and back up its settings before editing. For standard stable builds, the user settings locations are:
+
+| Platform | Audacity 4 settings |
+|---|---|
+| Windows | `%APPDATA%\Audacity\Audacity4.ini` |
+| Linux | `~/.config/Audacity/Audacity4.ini`, or `$XDG_CONFIG_HOME/Audacity/Audacity4.ini` |
+| macOS | Preferences domain `org.audacityteam.Audacity4`, normally stored in `~/Library/Preferences/org.audacityteam.Audacity4.plist` |
+
+Development builds use `Audacity4Development` instead of `Audacity4`. Windows portable builds relocate the INI root to their `Data/settings` tree.
+
+On Windows and Linux, add or update the following entries in the INI file. Qt represents the nested keys with backslashes under `[CloudServices]`; do not add a second copy of an existing key.
+
+```ini
+[CloudServices]
+AudioCom\ApiEndpoint=http://localhost:8080
+AudioCom\OAuthClientID=audiocity-desktop
+AudioCom\OAuthClientSecret=audiocity-local-desktop
+AudioCom\OAuthRedirectURL=http://localhost:8080/auth/callback
+AudioCom\OAuthLoginPage=http://localhost:8080/auth/authorize?response_type=code&client_id={auth_client_id}&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fcallback&scope=all
+AudioCom\FrontendURL=http://localhost:8080
+AudioCom\AuthWithRedirectURL=http://localhost:8080/auth/check-and-redirect
+AudioCom\TourPage=http://localhost:8080/
+AudioCom\FinishUploadPage=http://localhost:8080/
+```
+
+On macOS, use native preferences rather than editing a cached plist directly. Qt maps the logical slashes to dots in the native key names. For each entry above, write its value using `defaults write org.audacityteam.Audacity4 CloudServices.AudioCom.SETTING -string 'VALUE'`, replacing `SETTING` and `VALUE`. For example:
+
+```sh
+defaults write org.audacityteam.Audacity4 CloudServices.AudioCom.ApiEndpoint -string 'http://localhost:8080'
+defaults write org.audacityteam.Audacity4 CloudServices.AudioCom.OAuthClientID -string 'audiocity-desktop'
+```
+
+Apply all nine entries, including the frontend, tour and authenticated redirect origins. Replace the local URLs and client values as described in the Audacity 3 example above; preserve the encoded callback URL inside `OAuthLoginPage`. Restart Audacity, sign in with your Audiocity account, and test a small save and reopen before relying on it. The inspected Audacity 4 browser sign-in uses its own ephemeral `http://127.0.0.1:PORT/` callback; the configured login-page and manual callback values also keep legacy linking paths on this server. Audiocity supports its password sign-in and optional registration contracts. See [authentication compatibility](authentication.md#audacity-authentication-compatibility).
+
+Source references: Audacity 4.0.1 [cloud setting reads](https://github.com/audacity/audacity/blob/d82386ce31175f1641d0450566a73a993c635a75/au3/libraries/au3-cloud-audiocom/ServiceConfig.cpp#L132), [Qt settings adapter](https://github.com/audacity/audacity/blob/d82386ce31175f1641d0450566a73a993c635a75/src/au3wrap/internal/au3commonsettings.cpp#L141), [application identity](https://github.com/audacity/audacity/blob/d82386ce31175f1641d0450566a73a993c635a75/src/app/main.cpp#L94), its pinned framework's [storage format and portable paths](https://github.com/musescore/muse_framework/blob/3ba3cd6886433b41759d2d7adef8aef9bbbd546b/framework/global/settings.cpp#L49), and Qt's [platform storage rules](https://doc.qt.io/qt-6/qsettings.html#platform-specific-notes) and [macOS key mapping](https://github.com/qt/qtbase/blob/v6.8.3/src/corelib/io/qsettings_mac.cpp#L49).
 
 ### Project compatibility
 
