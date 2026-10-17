@@ -1,6 +1,11 @@
 # Releases and deployment packages
 
 Get official downloads from [GitHub Releases](https://github.com/mindscaper-org/audiocity/releases/latest).
+Container images are published to [GitHub Container Registry](https://github.com/mindscaper-org/audiocity/pkgs/container/audiocity)
+as `ghcr.io/mindscaper-org/audiocity:VERSION` and `:vVERSION`. Each version tag
+supports Linux amd64 and arm64; Docker selects the matching architecture.
+Deployment bundles pin an exact version. Version tags are not moved to newer releases.
+
 Each release provides:
 
 | Archive | Purpose |
@@ -12,12 +17,15 @@ Each release provides:
 | `audiocity-VERSION-source.tar.gz` | Complete source, tests, workflows, and build instructions |
 | `SHA256SUMS` | SHA-256 checksums of all five archives |
 
-The deployment bundle's `./deploy.sh` chooses the Docker server's architecture,
-downloads and verifies the image if that version is not already installed, loads
-it, and runs `docker compose up -d --wait`. It requires Docker with Compose,
-curl, and either sha256sum or shasum. Run it from a terminal with access to a local
-Linux Docker daemon. Docker Desktop runs Linux containers on macOS and Windows;
-use a POSIX shell such as WSL on Windows, or load the image and run Compose manually.
+The deployment bundle's `./deploy.sh` runs `docker compose up -d --wait`. Compose
+pulls the pinned image from GHCR when it is missing and reuses an installed image.
+Only Docker with Compose is required; public images need no registry login.
+You can also run `docker compose pull` followed by `docker compose up -d --wait`
+directly inside the deployment folder. The repository's root Compose file builds
+from source instead.
+
+Use a Linux Docker daemon. Docker Desktop runs Linux containers on macOS and
+Windows; use a POSIX shell such as WSL on Windows, or run Compose manually.
 
 Checksums can also be checked manually in the downloads directory:
 
@@ -26,8 +34,19 @@ sha256sum --ignore-missing -c SHA256SUMS
 ```
 
 On macOS use `shasum -a 256 FILE` and compare with its entry in SHA256SUMS.
-The script retrieves public GitHub assets and needs no registry login. Keep
-downloaded image archives for offline installs or rollback.
+For offline installation, download the deployment bundle, the Docker archive for
+your server's architecture, and `SHA256SUMS`. Verify the checksums, extract the
+bundle, then load the image and start it from the extracted deployment folder:
+
+```sh
+docker load -i /path/to/audiocity-VERSION-docker-ARCH.tar.gz
+docker compose up -d --wait --pull never
+```
+
+Replace `VERSION` and `ARCH` with the release version and `amd64` or `arm64`.
+The archive includes both `ghcr.io/mindscaper-org/audiocity:VERSION` and the
+compatibility tag `audiocity:VERSION`. Keep downloaded archives for offline
+installs or rollback.
 
 ## Configure and upgrade
 
@@ -73,7 +92,8 @@ To export an image locally on its target architecture:
 
 ```sh
 docker build -t audiocity:0.2.0 .
-docker save audiocity:0.2.0 | gzip > dist/release/audiocity-0.2.0-docker-amd64.tar.gz
+docker tag audiocity:0.2.0 ghcr.io/mindscaper-org/audiocity:0.2.0
+docker save ghcr.io/mindscaper-org/audiocity:0.2.0 audiocity:0.2.0 | gzip > dist/release/audiocity-0.2.0-docker-amd64.tar.gz
 cd dist/release
 sha256sum *.tar.gz > SHA256SUMS
 ```
@@ -88,7 +108,30 @@ and compiled package tests, and builds Docker images on native amd64 and arm64
 runners. Both images are loaded from their exported archives and tested using
 the actual deployment bundle, including authentication, audio ranges, block
 sync, whole-file archive round trips, and source availability. Only after all
-checks pass does it publish a GitHub Release with all archives and checksums.
+checks pass does the publishing job load and push those same tested images to
+GHCR as `VERSION-amd64` and `VERSION-arm64`, combine them under the `VERSION` and
+`vVERSION` tags, verify both platforms and anonymous pull access, and publish a
+GitHub Release with all archives and checksums. The publishing job downloads
+only release packages and Docker archives, excluding Buildx build records.
+
+The workflow uses GitHub's built-in `GITHUB_TOKEN`. Only the publishing job gets
+`contents: write` and `packages: write`; no separate registry credentials are
+required. Images link to their source repository through OCI metadata.
+
+### First GHCR publication
+
+GitHub creates new container packages as private, even for public repositories.
+After the first image upload, an organization/package administrator must open
+the package's **Package settings → Change visibility** and select **Public**.
+The workflow checks anonymous access before creating the GitHub Release. If the
+first run stops at that check, make the package public and rerun failed jobs.
+See [GitHub's package visibility instructions](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
+
+If organization policy restricts package creation, allow this repository to
+publish container packages. For an existing package, ensure the repository has
+write access under **Manage Actions access** in its package settings.
+
+### Create a version tag
 
 For the next release, update the version in `package.json` and the lockfile,
 the service version in `src/app.ts`, `CHANGELOG.md`, and release notes in
@@ -101,6 +144,4 @@ git push origin v0.2.0
 ```
 
 Use the next version in place of `v0.2.0`. Published version tags and their
-artifacts should remain immutable. The workflow uses GitHub's built-in token
-with release write access only in the publishing job; no registry or npm
-publishing credentials are required.
+artifacts should remain immutable. No npm publishing credentials are required.

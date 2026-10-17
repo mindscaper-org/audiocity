@@ -1,5 +1,12 @@
 # Release notes
 
+## Unreleased
+
+- Publish tested Linux amd64 and arm64 images to GitHub Container Registry under
+  versioned multi-platform tags, using the release workflow's built-in token.
+- Pull version-pinned GHCR images in deployment bundles while retaining verified
+  image archives for offline installation.
+
 ## 0.2.0 — 2026-10-17
 
 - Consolidate the browser library into Audio and Projects tabs, with one header

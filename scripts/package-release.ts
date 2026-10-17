@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { version: string; scripts: Record<string, string> };
 const version = manifest.version;
+const image = `ghcr.io/${(process.env.GITHUB_REPOSITORY || 'mindscaper-org/audiocity').toLowerCase()}:${version}`;
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Releases require a stable semantic version.');
 if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${version}`) {
 	throw new Error('The release tag must match package.json.');
@@ -63,10 +64,10 @@ at /source.tar.gz. For Docker deployment use the separate deploy package.
 	});
 	archive('deploy', directory => {
 		const compose = readFileSync(join(root, 'compose.yaml'), 'utf8')
-			.replace('    build: .\n', '').replace('    image: audiocity:local', `    image: audiocity:${version}\n    pull_policy: never`);
+			.replace('    build: .\n', '').replace('    image: audiocity:local', `    image: ${image}\n    pull_policy: missing`);
 		writeFileSync(join(directory, 'compose.yaml'), `name: audiocity\n${compose}`);
 		for (const name of ['.env.example', 'LICENSE', 'NOTICE.md', 'docs']) copy(name, directory);
-		const deploy = readFileSync(join(root, 'scripts/deploy.sh'), 'utf8').replaceAll('@VERSION@', version);
+		const deploy = readFileSync(join(root, 'scripts/deploy.sh'), 'utf8');
 		writeFileSync(join(directory, 'deploy.sh'), deploy, { mode: 0o755 });
 		writeFileSync(join(directory, 'README.md'), `# Audiocity ${version}: Docker deployment
 
@@ -77,10 +78,11 @@ Install Docker Engine or Docker Desktop with Compose v2 or newer, then run:
 docker compose logs audiocity
 \x60\x60\x60
 
-The script downloads the prebuilt Linux image for your Docker server's architecture
-(amd64 or arm64), verifies its SHA-256 checksum, loads it into Docker, and starts
-Audiocity. It requires curl and sha256sum (or shasum). No registry account or local
-build is needed. Use a local Docker daemon; data lives on that daemon's machine.
+Docker pulls ${image} from GitHub Container Registry when it is not already
+installed, selects Linux amd64 or arm64 for your Docker server, and starts
+Audiocity. No registry account or local build is needed. You can also run
+docker compose pull followed by docker compose up -d --wait directly.
+Data lives on your Docker daemon's machine.
 
 Open http://localhost:8080. Save the generated administrator password shown once
 in the logs, sign in, and change it through Menu → Change password.
@@ -94,7 +96,7 @@ and SHA256SUMS from the release page, verify the checksum, then run:
 
 \x60\x60\x60sh
 docker load -i audiocity-${version}-docker-ARCH.tar.gz
-docker compose up -d --wait
+docker compose up -d --wait --pull never
 \x60\x60\x60
 
 Data persists in the audiocity_audiocity-data named volume. Keep the Compose

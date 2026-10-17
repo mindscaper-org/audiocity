@@ -28,7 +28,7 @@ Install Docker with Compose v2 or newer, then:
 docker compose logs audiocity
 ```
 
-The script downloads the prebuilt Linux image for your Docker server (amd64 or arm64), checks its SHA-256 checksum, and starts the service. No registry account or build tools are needed. The bundle includes `.env.example`, client setup, and operations documentation. For offline deployment, download the matching Docker image archive from the same release, run `docker load -i FILE`, then `docker compose up -d --wait` inside the deployment folder. A compiled Node.js package and full source archive are also available; see [release packaging](docs/releases.md).
+Docker pulls the bundle's pinned image from GitHub Container Registry (`ghcr.io/mindscaper-org/audiocity:VERSION`), selects Linux amd64 or arm64 for your server, and starts the service. No registry account or build tools are needed. The bundle includes `.env.example`, client setup, and operations documentation. You can also run `docker compose pull` followed by `docker compose up -d --wait` inside the deployment folder. For offline deployment, verify and load the matching Docker image archive from the same release, then run `docker compose up -d --wait --pull never`. A compiled Node.js package and full source archive are also available; see [release packaging](docs/releases.md).
 
 To build from a source checkout instead:
 
