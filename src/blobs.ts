@@ -64,15 +64,18 @@ export class BlobStorage implements BlobService {
 		if (this.usage(ownerId) + (options.expectedSize ?? 0) > this.config.maxUserBytes) throw new ApiError(413, 'Storage quota exceeded.');
 		const mime = options.mime ?? 'application/octet-stream';
 		if (!/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(mime)) throw new ApiError(422, 'Invalid MIME type.');
-		const id = randomUUID(); const token = randomBytes(32).toString('base64url');
+		const id = randomUUID(); const token = randomBytes(32).toString('base64url'); const expires = now() + this.config.uploadTtlSeconds;
 		this.db.run(`INSERT INTO blobs (id,owner_id,kind,resource_id,mime,path,expected_size,capability_hash,expires,max_bytes)
 			VALUES (?,?,?,?,?,?,?,?,?,?)`, id, ownerId, options.kind, options.resourceId, mime,
-			join(this.config.dataDir, 'blobs', id), options.expectedSize ?? null, digest(token), now() + this.config.uploadTtlSeconds, maximum);
+			join(this.config.dataDir, 'blobs', id), options.expectedSize ?? null, digest(token), expires, maximum);
 		if (options.validate) this.validators.set(id, options.validate);
-		return this.descriptor(id, token);
+		return this.descriptor(id, token, expires);
 	}
-	private descriptor(id: string, token: string): UploadDescriptor {
-		const base = `${this.config.publicUrl}/uploads/${id}`; const query = `?token=${token}`;
+	private descriptor(id: string, token: string, expires: number): UploadDescriptor {
+		const issued = new Date((expires - this.config.uploadTtlSeconds) * 1000).toISOString().replaceAll(/[:-]|\.\d{3}/g, '');
+		const base = `${this.config.publicUrl}/uploads/${id}`;
+		// Audacity's resumed uploader reads these expiry hints before renewing URLs.
+		const query = `?${new URLSearchParams({ token, 'X-Amz-Date': issued, 'X-Amz-Expires': String(this.config.uploadTtlSeconds) })}`;
 		return { id, url: base + query, success: `${base}/success${query}`, fail: `${base}/fail${query}`, progress: `${base}/progress${query}` };
 	}
 	renew(id: string): UploadDescriptor {
@@ -81,9 +84,9 @@ export class BlobStorage implements BlobService {
 		if (blob.state === 'pending' && blob.expires < now() && this.usage(blob.owner_id) + (this.inflight.has(id) ? 0 : blob.expected_size ?? 0) > this.config.maxUserBytes) {
 			throw new ApiError(413, 'Storage quota exceeded.');
 		}
-		const token = randomBytes(32).toString('base64url');
-		this.db.run('UPDATE blobs SET capability_hash=?,expires=? WHERE id=?', digest(token), now() + this.config.uploadTtlSeconds, id);
-		return this.descriptor(id, token);
+		const token = randomBytes(32).toString('base64url'); const expires = now() + this.config.uploadTtlSeconds;
+		this.db.run('UPDATE blobs SET capability_hash=?,expires=? WHERE id=?', digest(token), expires, id);
+		return this.descriptor(id, token, expires);
 	}
 	get(id: string): BlobInfo | undefined { return this.db.get<Transfer>('SELECT * FROM blobs WHERE id=?', id); }
 	setValidator(kind: string, validate: (blob: BlobInfo, path: string) => void | Promise<void>): void {
