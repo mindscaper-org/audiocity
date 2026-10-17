@@ -179,6 +179,40 @@ void test('OAuth rejects unsafe redirects, absent PKCE, unsupported scope, and c
 	} finally { await f.close(); }
 });
 
+void test('OAuth forms in separate tabs retain independent browser validation', async () => {
+	const f = await fixture();
+	try {
+		const client = await registerClient(f);
+		const query = new URLSearchParams({ response_type: 'code', client_id: client.id, redirect_uri: client.redirect,
+			code_challenge: 'a'.repeat(43), code_challenge_method: 'S256' });
+		const jar = new Map<string, string>();
+		const forms: string[] = [];
+		const cookieHeader = () => [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
+		for (let tab = 0; tab < 2; tab++) {
+			const page = await f.app.inject({ url: `/auth/authorize?${query}`, headers: { cookie: cookieHeader() } });
+			assert.equal(page.statusCode, 200);
+			const flow = page.body.match(/name="flow" value="([^"]+)"/)?.[1];
+			assert.ok(flow);
+			forms.push(flow);
+			const cookie = String(page.headers['set-cookie']).split(';')[0]!;
+			const separator = cookie.indexOf('=');
+			jar.set(cookie.slice(0, separator), cookie.slice(separator + 1));
+		}
+		const approved = await f.app.inject({ method: 'POST', url: '/auth/authorize', headers: { cookie: cookieHeader() },
+			payload: { flow: forms[0], username: f.config.adminEmail, password: f.config.adminPassword, consent: 'allow' } });
+		assert.equal(approved.statusCode, 303);
+		assert.ok(new URL(String(approved.headers.location)).searchParams.get('code'));
+		assert.match(String(approved.headers['set-cookie']), /Max-Age=0/);
+		const removed = String(approved.headers['set-cookie']).split('=')[0]!;
+		jar.delete(removed);
+		const cancelled = await f.app.inject({ method: 'POST', url: '/auth/authorize', headers: { cookie: cookieHeader() },
+			payload: { flow: forms[1], consent: 'deny' } });
+		assert.equal(cancelled.statusCode, 303);
+		assert.equal(new URL(String(cancelled.headers.location)).searchParams.get('error'), 'access_denied');
+		assert.match(String(cancelled.headers['set-cookie']), /Max-Age=0/);
+	} finally { await f.close(); }
+});
+
 void test('public-scoped token cannot enter project routes and refresh is client bound', async () => {
 	const f = await fixture();
 	try {

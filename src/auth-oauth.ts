@@ -125,9 +125,13 @@ export class OAuthAuthorization {
 		this.auth.db.run('DELETE FROM oauth_flows WHERE expires <= ?', now());
 		this.auth.db.run('DELETE FROM oauth_codes WHERE expires <= ?', now());
 		this.auth.db.run('INSERT INTO oauth_flows VALUES (?, ?, ?, ?, ?, ?, ?, ?)', digest(flow), digest(cookie), client.id, redirect, scope, state, challenge, now() + 600);
-		const secure = this.auth.config.publicUrl.startsWith('https:') ? '; Secure' : '';
-		reply.header('Set-Cookie', `audiocity_oauth=${cookie}; Path=/auth/authorize; HttpOnly; SameSite=Strict; Max-Age=600${secure}`);
+		// Each tab needs its own binding; a single cookie invalidates older forms.
+		this.flowCookie(reply, digest(flow), cookie, 600);
 		return this.html(reply, authorizationHtml(flow, client.name, scope), redirect);
+	}
+	private flowCookie(reply: FastifyReply, flowHash: string, value: string, maxAge: number): void {
+		const secure = this.auth.config.publicUrl.startsWith('https:') ? '; Secure' : '';
+		reply.header('Set-Cookie', `audiocity_oauth_${flowHash}=${value}; Path=/auth/authorize; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`);
 	}
 	private html(reply: FastifyReply, html: string, redirect: string) {
 		const target = new URL(redirect);
@@ -144,9 +148,10 @@ export class OAuthAuthorization {
 		const body = objectBody(request.body);
 		const flowId = requiredString(body.flow, 'flow', 100);
 		const flow = this.auth.db.get<Flow>('SELECT * FROM oauth_flows WHERE hash = ? AND expires > ?', digest(flowId), now());
-		if (!flow || digest(cookies(request).audiocity_oauth ?? '') !== flow.cookie_hash) throw new ApiError(403, 'Authorization form expired or browser validation failed. Open the authorization link again.');
+		if (!flow || digest(cookies(request)[`audiocity_oauth_${flow.hash}`] ?? '') !== flow.cookie_hash) throw new ApiError(403, 'Authorization form expired or browser validation failed. Open the authorization link again.');
 		if (body.consent === 'deny') {
 			this.auth.db.run('DELETE FROM oauth_flows WHERE hash = ?', flow.hash);
+			this.flowCookie(reply, flow.hash, '', 0);
 			return reply.code(303).redirect(urlWithResult(flow, 'error', 'access_denied'));
 		}
 		if (body.consent !== 'allow') throw new ApiError(422, 'Explicit consent is required.');
@@ -163,6 +168,7 @@ export class OAuthAuthorization {
 			if (Number(removed.changes) !== 1) throw new ApiError(403, 'Authorization form has already been used.');
 			this.auth.db.run('INSERT INTO oauth_codes VALUES (?, ?, ?, ?, ?, ?, ?)', digest(code), user.id, flow.client_id, flow.redirect_uri, flow.scope, flow.challenge, now() + 120);
 		});
+		this.flowCookie(reply, flow.hash, '', 0);
 		return reply.code(303).redirect(urlWithResult(flow, 'code', code));
 	}
 	exchange(body: Record<string, unknown>, client: AuthClient): TokenGrant {
