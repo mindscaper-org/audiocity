@@ -1,5 +1,5 @@
 import { ApiError, now } from './core.ts';
-import type { Context } from './core.ts';
+import type { BlobInfo, Context } from './core.ts';
 import { descriptor, getSnapshot, projectClientId, snapshotBlocks } from './projects-store.ts';
 import type { BlockRow, ProjectRow, SnapshotRow } from './projects-store.ts';
 
@@ -10,9 +10,14 @@ export function snapshotPreview(ctx: Context, snapshot: SnapshotRow) {
 	} : null;
 }
 
+function requireSnapshotUploads(ctx: Context, file: BlobInfo | undefined, blocks: BlockRow[]): void {
+	if (!file || blocks.some(block => !ctx.blobs.ready(block.blob_id))) throw new ApiError(409, 'Upload and confirm the project file and every missing block before completing synchronization.', 'UploadIncomplete');
+}
+
 export function snapshotInfo(ctx: Context, snapshot: SnapshotRow, expand = false) {
 	const file = ctx.blobs.ready(snapshot.file_id);
 	const blocks = snapshotBlocks(ctx, snapshot);
+	if (expand && snapshot.synced) requireSnapshotUploads(ctx, file, blocks);
 	return {
 		id: snapshot.id, parent_id: snapshot.parent_id,
 		date_created: snapshot.created, date_updated: snapshot.updated, date_synced: snapshot.synced,
@@ -59,7 +64,8 @@ function replaceFailedBlock(ctx: Context, block: BlockRow): BlockRow {
 	if (blob && (blob.state === 'ready' || (blob.state !== 'failed' && blob.expires > now())) && sameUploadOrigin(ctx, block.upload)) return block;
 	const upload = blob && blob.state !== 'failed' ? ctx.blobs.renew(blob.id) : ctx.blobs.create(block.owner_id, { kind: 'project-block', resourceId: block.hash, mime: 'application/octet-stream', maxBytes: 64 * 1024 * 1024 });
 	const row = { ...block, blob_id: upload.id, upload: JSON.stringify(upload) };
-	ctx.db.run('UPDATE project_blocks SET blob_id=?,upload=? WHERE owner_id=? AND hash=?', row.blob_id, row.upload, row.owner_id, row.hash);
+	ctx.db.run(`INSERT INTO project_blocks (owner_id,hash,blob_id,upload) VALUES (?,?,?,?)
+		ON CONFLICT(owner_id,hash) DO UPDATE SET blob_id=excluded.blob_id,upload=excluded.upload`, row.owner_id, row.hash, row.blob_id, row.upload);
 	return row;
 }
 
@@ -90,9 +96,9 @@ export function syncState(ctx: Context, project: ProjectRow, snapshot: SnapshotR
 }
 
 export function completeSnapshot(ctx: Context, project: ProjectRow, snapshot: SnapshotRow) {
+	if (!snapshot.synced && project.head_id !== snapshot.id) throw new ApiError(409, 'A newer project head exists. This snapshot cannot replace it.', 'ProjectVersionConflict');
+	requireSnapshotUploads(ctx, ctx.blobs.ready(snapshot.file_id), snapshotBlocks(ctx, snapshot));
 	if (snapshot.synced) return snapshotInfo(ctx, snapshot, true);
-	if (project.head_id !== snapshot.id) throw new ApiError(409, 'A newer project head exists. This snapshot cannot replace it.', 'ProjectVersionConflict');
-	if (!ctx.blobs.ready(snapshot.file_id) || snapshotBlocks(ctx, snapshot).some((block) => !ctx.blobs.ready(block.blob_id))) throw new ApiError(409, 'Upload and confirm the project file and every missing block before completing synchronization.', 'UploadIncomplete');
 	const date = now();
 	ctx.db.transaction(() => {
 		ctx.db.run('UPDATE snapshots SET synced=?,updated=? WHERE id=?', date, date, snapshot.id);

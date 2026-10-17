@@ -90,7 +90,9 @@ export function getSnapshot(ctx: Context, project: ProjectRow, id: string): Snap
 }
 
 export function snapshotBlocks(ctx: Context, snapshot: SnapshotRow): BlockRow[] {
-	return ctx.db.all<BlockRow>('SELECT b.* FROM project_blocks b JOIN snapshot_blocks s ON b.owner_id=s.owner_id AND b.hash=s.hash WHERE s.snapshot_id=? ORDER BY b.hash', snapshot.id);
+	return ctx.db.all<BlockRow>(`SELECT s.owner_id,s.hash,COALESCE(b.blob_id,'') blob_id,COALESCE(b.upload,'') upload
+		FROM snapshot_blocks s LEFT JOIN project_blocks b ON b.owner_id=s.owner_id AND b.hash=s.hash
+		WHERE s.snapshot_id=? ORDER BY s.hash`, snapshot.id);
 }
 
 export function createProject(ctx: Context, user: User, form: ProjectForm): ProjectRow {
