@@ -1,7 +1,7 @@
 /** Library and audio page code shares the console's small DOM and API helpers. */
 export const consoleLibrary = String.raw`
 	const visibilityOptions = [['private', 'Private'], ['unlisted', 'Unlisted: direct link'], ['public', 'Public: shared library']];
-	const defaultLicenses = [['arr', 'All rights reserved'], ['cc-0', 'CC0 1.0 Universal'], ['cc-by', 'Creative Commons Attribution 4.0'], ['cc-by-sa', 'Creative Commons Attribution-ShareAlike 4.0'], ['cc-by-nc', 'Creative Commons Attribution-NonCommercial 4.0'], ['cc-by-nc-sa', 'Creative Commons Attribution-NonCommercial-ShareAlike 4.0'], ['cc-by-nd', 'Creative Commons Attribution-NoDerivatives 4.0'], ['cc-by-nc-nd', 'Creative Commons Attribution-NonCommercial-NoDerivatives 4.0']];
+	const defaultLicenses = [['none', 'No license selected'], ['arr', 'All rights reserved'], ['cc-0', 'CC0 1.0 Universal'], ['cc-by', 'Creative Commons Attribution 4.0'], ['cc-by-sa', 'Creative Commons Attribution-ShareAlike 4.0'], ['cc-by-nc', 'Creative Commons Attribution-NonCommercial 4.0'], ['cc-by-nc-sa', 'Creative Commons Attribution-NonCommercial-ShareAlike 4.0'], ['cc-by-nd', 'Creative Commons Attribution-NoDerivatives 4.0'], ['cc-by-nc-nd', 'Creative Commons Attribution-NonCommercial-NoDerivatives 4.0']];
 	const defaultCategories = [['music', 'Music'], ['podcast', 'Podcast'], ['voiceover', 'Voiceover'], ['sfx', 'SFX'], ['cover', 'Cover'], ['beats', 'Beats'], ['audiobook', 'Audiobook'], ['recording', 'Recording'], ['other', 'Other']];
 	let audioSource;
 	let audioQuery = '';
@@ -83,7 +83,7 @@ export const consoleLibrary = String.raw`
 	function metadataList(item, options) {
 		const details = node('dl'); details.className = 'metadata';
 		const category = (options?.categories || defaultCategories.map(([id, name]) => ({ id, name }))).find(entry => entry.id === item.category)?.name || item.category;
-		const license = (options?.licenses || defaultLicenses.map(([id, name]) => ({ id, name }))).find(entry => entry.id === item.license)?.name || (item.license === 'none' ? 'All rights reserved' : item.license);
+		const license = (options?.licenses || defaultLicenses.map(([id, name]) => ({ id, name }))).find(entry => entry.id === item.license)?.name || (item.license === 'none' ? 'No license selected' : item.license);
 		for (const [label, value] of [['Uploaded by', item.author_name || item.username || 'Shared folder'], ['Category', category], ['License', license], ['Format', item.source.mime], ['Size', item.source.size.toLocaleString() + ' bytes'], ['Visibility', item.visibility]]) details.append(node('dt', label), node('dd', value));
 		return details;
 	}
@@ -124,7 +124,7 @@ export const consoleLibrary = String.raw`
 		const category = select(form, 'Category', optionPairs(options.categories), item.category);
 		const tags = field(form, 'Tags', 'text', item.tags.join(', ')); form.append(node('small', 'Separate tags with commas.'));
 		const descriptionLabel = node('label', 'Description'); const description = node('textarea'); description.value = item.description; description.maxLength = 500; descriptionLabel.append(description); form.append(descriptionLabel);
-		const license = select(form, 'License', optionPairs(options.licenses), item.license === 'none' ? 'arr' : item.license);
+		const license = select(form, 'License', optionPairs(options.licenses), item.license);
 		let visibility; let downloadable;
 		if (item.origin !== 'shared-folder') {
 			visibility = select(form, 'Visibility', visibilityOptions, item.visibility);

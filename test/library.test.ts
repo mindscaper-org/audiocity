@@ -58,11 +58,11 @@ void test('metadata options include default categories and all CC licenses; only
 		const other = await createUser(f.app, f.token);
 		const options = (await f.app.inject('/library/options')).json<{ categories: { id: string }[]; licenses: { id: string }[] }>();
 		assert.deepEqual(options.categories.map(row => row.id), ['music', 'podcast', 'voiceover', 'sfx', 'cover', 'beats', 'audiobook', 'recording', 'other']);
-		assert.equal(options.licenses.length, 8);
+		assert.equal(options.licenses.length, 9);
 		assert.equal((await f.app.inject({ method: 'POST', url: '/admin/categories', headers: auth(other.token), payload: { id: 'nature', name: 'Nature' } })).statusCode, 403);
 		assert.equal((await f.app.inject({ method: 'POST', url: '/admin/categories', headers: auth(f.token), payload: { id: 'nature', name: 'Nature' } })).statusCode, 201);
 		const item = await audio(f, f.token, { category: 'nature', license: 'none' });
-		assert.equal(item.license, 'arr');
+		assert.equal(item.license, 'none');
 		assert.equal((await f.app.inject({ method: 'DELETE', url: '/admin/categories/nature', headers: auth(f.token) })).statusCode, 409);
 		assert.equal((await f.app.inject({ method: 'DELETE', url: '/admin/categories/other', headers: auth(f.token) })).statusCode, 409);
 		assert.equal((await f.app.inject({ method: 'DELETE', url: '/admin/categories/beats', headers: auth(f.token) })).statusCode, 204);

@@ -14,6 +14,7 @@ export const defaultCategories = [
 	['cover', 'Cover'], ['beats', 'Beats'], ['audiobook', 'Audiobook'], ['recording', 'Recording'], ['other', 'Other'],
 ] as const;
 export const audioLicenses = [
+	{ id: 'none', name: 'No license selected' },
 	{ id: 'arr', name: 'All rights reserved' }, { id: 'cc-0', name: 'CC0 1.0 — Public domain dedication' },
 	{ id: 'cc-by', name: 'Creative Commons Attribution 4.0' },
 	{ id: 'cc-by-sa', name: 'Creative Commons Attribution-ShareAlike 4.0' },
@@ -22,7 +23,7 @@ export const audioLicenses = [
 	{ id: 'cc-by-nd', name: 'Creative Commons Attribution-NoDerivatives 4.0' },
 	{ id: 'cc-by-nc-nd', name: 'Creative Commons Attribution-NonCommercial-NoDerivatives 4.0' },
 ];
-const licenses = new Set(['none', ...audioLicenses.map(license => license.id)]);
+const licenses = new Set(audioLicenses.map(license => license.id));
 export const mutableFields = new Set(['title', 'slug', 'category', 'description', 'tags', 'license', 'is_listed', 'is_downloadable', 'visibility', 'public']);
 
 export function initializeAudioSchema(db: Database): void {
@@ -50,7 +51,6 @@ export function initializeAudioSchema(db: Database): void {
 		for (const [id, name] of defaultCategories) db.run('INSERT OR IGNORE INTO audio_categories(id,name) VALUES (?,?)', id, name);
 		db.run("UPDATE audio SET category='voiceover' WHERE category='voice-over'");
 		db.run("UPDATE audio SET category='sfx' WHERE category='sound-design'");
-		db.run("UPDATE audio SET license='arr' WHERE license='none'");
 		db.run("INSERT INTO library_migrations(id) VALUES ('categories-v1')");
 	});
 }
@@ -88,7 +88,7 @@ export function validateMetadata(db: Database, body: Record<string, unknown>, cu
 	if ('license' in body) {
 		const value = requiredString(body.license, 'license', 32);
 		if (!licenses.has(value)) throw new ApiError(422, 'Unsupported license.', 'ValidationError');
-		result.license = value === 'none' ? 'arr' : value;
+		result.license = value;
 	}
 	if ('is_listed' in body) result.visibility = boolean(body.is_listed, 'is_listed') ? 'public' : 'unlisted';
 	if ('public' in body) result.visibility = boolean(body.public, 'public') ? 'public' : 'unlisted';

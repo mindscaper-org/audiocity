@@ -18,7 +18,6 @@ export const consoleManage = String.raw`
 	function rawValue(item, key) {
 		if (key === 'tags') return item.tags.join(', ');
 		if (key === 'is_downloadable') return String(item.is_downloadable);
-		if (key === 'license' && item.license === 'none') return 'arr';
 		return String(item[key] ?? '');
 	}
 	function cellValue(row, col) { const item = manageRows[row]; const key = manageColumns[col][0]; return manageDrafts.get(item.id)?.[key] ?? rawValue(item, key); }

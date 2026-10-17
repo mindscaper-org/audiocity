@@ -61,10 +61,13 @@ a playback URL expires.
 Title and name are limited to 256 characters, description to 500, and tags to 50
 strings of at most 64 characters. Slugs use lowercase letters, digits and hyphens
 and are unique within one user's library. Automatic slugs receive numeric suffixes
-when needed. Categories are persisted and controlled by administrators; legacy
-`voice-over` and `sound-design` category IDs map to `voiceover` and `sfx`.
-Licenses include All rights reserved, CC0 and the six Creative Commons 4.0
-licenses. The legacy `none` license is accepted as All rights reserved.
+when needed. Categories are persisted and controlled by administrators. The public
+API uses the standard `voice-over` and `sound-design` category IDs; the browser
+library stores those as `voiceover` and `sfx`. Custom browser categories are
+reported as `other` by the public API.
+Licenses include no license selected (`none`, the API default), All rights reserved
+(`arr`), CC0 and the six Creative Commons 4.0 licenses. The console explicitly
+selects All rights reserved for new browser uploads.
 
 ## Search public recordings
 

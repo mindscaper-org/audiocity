@@ -41,15 +41,20 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 		}
 		return row;
 	}
-	function metadata(row: AudioRecord, legacyList = false, viewer?: User) {
+	function metadata(row: AudioRecord, legacyList = false, viewer?: User, publicApi = false) {
 		const user = ctx.auth.findUser(row.owner_id);
 		const folder = row.origin === 'shared-folder';
 		const blob = folder ? undefined : ctx.blobs.get(row.blob_id);
 		const ready = folder ? Boolean(row.shared_present) : ctx.blobs.ready(row.blob_id);
 		const url = ready ? folder ? shared.downloadUrl(row) : ctx.blobs.downloadUrl(row.blob_id) : '';
+		let category = row.category;
+		if (publicApi) {
+			category = category === 'voiceover' ? 'voice-over' : category === 'sfx' ? 'sound-design' : category;
+			if (!['music', 'podcast', 'voice-over', 'sound-design', 'cover', 'beats', 'audiobook', 'recording', 'other'].includes(category)) category = 'other';
+		}
 		return {
 			id: row.id, title: row.title, slug: row.slug, name: row.name,
-			category: row.category, description: row.description, tags: JSON.parse(row.tags) as string[], license: row.license,
+			category, description: row.description, tags: JSON.parse(row.tags) as string[], license: row.license,
 			visibility: row.visibility, is_public: row.visibility === 'public', is_listed: row.visibility === 'public',
 			is_downloadable: Boolean(row.is_downloadable), status: ready ? 'ready' : blob?.state === 'failed' ? 'failed' : 'pending',
 			author_name: folder ? 'Shared library' : user?.name ?? '', username: user?.username ?? '',
@@ -101,7 +106,7 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 		const title = name.replace(/\.[^.]{1,8}$/, '') || name;
 		let row = validateMetadata(ctx.db, body, {
 			id: randomUUID(), owner_id: user.id, blob_id: '', name, title, slug: audioSlug(title),
-			category: 'other', description: '', tags: '[]', license: 'arr', visibility: 'unlisted',
+			category: 'other', description: '', tags: '[]', license: 'none', visibility: 'unlisted',
 			is_downloadable: 0, duration: 0, created: now(), updated: now(),
 			origin: 'upload', shared_path: '', shared_size: 0, shared_mtime: 0, shared_mime: '', shared_present: 0,
 		});
@@ -119,7 +124,7 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 				VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, row.id, row.owner_id, row.blob_id, row.name, row.title, row.slug, row.category,
 				row.description, row.tags, row.license, row.visibility, row.is_downloadable, row.duration, row.created, row.updated);
 		} catch (error) { await ctx.blobs.remove(policy.id); throw error; }
-		const audio = metadata(row, false, user);
+		const audio = metadata(row, false, user, request.routeOptions.url === '/v1/audio/create');
 		return { ...policy, audio, extra: { audio } };
 	}
 
@@ -151,7 +156,7 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 		const rows = ctx.db.all<AudioRecord>(`SELECT audio.* FROM audio LEFT JOIN users ON users.id=audio.owner_id
 			WHERE ${scope.sql} AND ${matching}
 			ORDER BY audio.created DESC,audio.rowid DESC LIMIT 10 OFFSET ?`, ...scope.values, ...params, (Number(pageValue) - 1) * 10);
-		return rows.map(row => ({ type: 'audio', model: metadata(row) }));
+		return rows.map(row => ({ type: 'audio', model: metadata(row, false, undefined, true) }));
 	});
 
 	async function list(request: FastifyRequest, legacy: boolean, library = false) {
@@ -170,7 +175,7 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 		const values = [...where.values, pattern, pattern, pattern];
 		const total = ctx.db.get<{ count: number }>(`SELECT count(*) AS count FROM audio WHERE ${filter}`, ...values)?.count ?? 0;
 		const rows = ctx.db.all<AudioRecord>(`SELECT * FROM audio WHERE ${filter} ORDER BY ${order} LIMIT ? OFFSET ?`, ...values, perPage, (page - 1) * perPage);
-		const items = rows.map(row => metadata(row, legacy, user));
+		const items = rows.map(row => metadata(row, legacy, user, !legacy && !library));
 		return legacy || library ? { items, pagination: { total, pages: Math.ceil(total / perPage), page, size: perPage } } : items;
 	}
 	app.get('/v1/audio/list', request => list(request, false));
@@ -261,7 +266,7 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 			row = find(id);
 			if (!(row.origin === 'shared-folder' || row.visibility === 'public' && ctx.blobs.ready(row.blob_id))) throw error;
 		}
-		return metadata(row, false, user);
+		return metadata(row, false, user, true);
 	});
 	app.get<{ Params: { id: string } }>('/audio/:id', request => metadata(visible(request, request.params.id)));
 	app.get<{ Params: { id: string } }>('/public/audio/:id', request => {
@@ -285,14 +290,14 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 	});
 
 	app.patch('/v1/audio/update', request => {
-		const row = find(queryId(request), owner(request).id);
+		const user = owner(request); const row = find(queryId(request), user.id);
 		const body = objectBody(request.body);
 		if (!Object.keys(body).some(key => mutableFields.has(key))) throw new ApiError(422, 'Supply at least one editable audio field.', 'ValidationError');
 		const updated = validateMetadata(ctx.db, body, row);
 		ensureUnique(updated);
 		ctx.db.run('UPDATE audio SET title=?,slug=?,category=?,description=?,tags=?,license=?,visibility=?,is_downloadable=?,updated=? WHERE id=?',
 			updated.title, updated.slug, updated.category, updated.description, updated.tags, updated.license, updated.visibility, updated.is_downloadable, now(), updated.id);
-		return metadata(find(updated.id));
+		return metadata(find(updated.id), false, user, true);
 	});
 	app.post('/v1/audio/delete', async (request, reply) => {
 		const row = find(queryId(request), owner(request).id);

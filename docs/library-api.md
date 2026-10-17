@@ -10,7 +10,7 @@ Owners can `PATCH /library/audio/:id`. Administrators can edit folder entries' m
 
 `GET /library/options` is public and returns `categories`, `licenses`, and `shared_folder`. Categories are managed by administrators through `GET/POST /admin/categories` and `PATCH/DELETE /admin/categories/:id`. Creating a category takes `{ "id": "field-recording", "name": "Field recording" }`; renaming takes `{ "name": "…" }`. IDs remain stable. Categories in use and the fallback `other` category cannot be deleted. Defaults are seeded only on initial migration. Legacy category IDs `voice-over` and `sound-design` are accepted as aliases for `voiceover` and `sfx`.
 
-Licenses are `arr` (All rights reserved), `cc-0` (CC0 1.0), and the six Creative Commons 4.0 licenses: `cc-by`, `cc-by-sa`, `cc-by-nc`, `cc-by-nc-sa`, `cc-by-nd`, and `cc-by-nc-nd`. Legacy `none` is accepted as `arr`.
+Licenses are `none` (No license selected), `arr` (All rights reserved), `cc-0` (CC0 1.0), and the six Creative Commons 4.0 licenses: `cc-by`, `cc-by-sa`, `cc-by-nc`, `cc-by-nc-sa`, `cc-by-nd`, and `cc-by-nc-nd`. An explicit `none` value is preserved through edits and restarts. API uploads default to `none`; browser uploads explicitly select `arr`.
 
 `GET/PATCH /library/preferences` reads or changes `{ "include_shared": true }` for the signed-in user. It defaults to true. Turning it off hides shared audio from default browser and native Audacity lists/search, while explicit browser `source=shared` and existing playback links still work.
 

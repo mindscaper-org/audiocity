@@ -14,7 +14,7 @@ WavPack uploads use a local WebAssembly decoder in the browser, including the lo
 
 Open a recording and choose **Edit** to change its title, slug, category, tags, description, license, visibility and download setting. The slug gives the recording a readable URL under its owner's username. The stable ID playback URL continues to identify the same recording after a slug change.
 
-Categories are managed by administrators. Defaults are Music, Podcast, Voiceover, SFX, Cover, Beats, Audiobook, Recording and Other. Tags and descriptions are controlled by the recording's owner. License choices include All rights reserved, CC0, and the six Creative Commons 4.0 licenses: CC BY, CC BY-SA, CC BY-ND, CC BY-NC, CC BY-NC-SA and CC BY-NC-ND.
+Categories are managed by administrators. Defaults are Music, Podcast, Voiceover, SFX, Cover, Beats, Audiobook, Recording and Other. Tags and descriptions are controlled by the recording's owner. License choices include No license selected, All rights reserved, CC0, and the six Creative Commons 4.0 licenses: CC BY, CC BY-SA, CC BY-ND, CC BY-NC, CC BY-NC-SA and CC BY-NC-ND.
 
 Choose **Manage files** for the metadata table. Select a cell or a rectangle with Shift and edit several values together. Copy and paste tab-separated cells from a spreadsheet, including quoted cells containing newlines or tabs. The page provides keyboard instructions for selection, editing, filling and undo. Changes stay as drafts until **Save changes**; invalid or unauthorized changes leave the drafts available for correction. Saving a batch validates every row and applies it as one transaction.
 
