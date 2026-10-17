@@ -160,3 +160,13 @@ test('metadata table supports rectangular TSV, fill, undo and atomic errors with
 	await page.getByRole('button', { name: 'Discard changes', exact: true }).click();
 	await expect(page.locator(`[role=gridcell][data-row="${first}"][data-key=description]`)).toHaveText('Same description');
 });
+
+test('opening a missing recording keeps the authenticated session', async ({ page, request }) => {
+	const token = await grant(request);
+	await signedIn(page, token, '/audio/missing-recording/play');
+	await expect(page.locator('#message')).toContainText('not found');
+	expect(await page.evaluate(() => sessionStorage.getItem('audiocity.access-token'))).toBe(token);
+	await expect(page.locator('#session')).toContainText('Signed in as');
+	await menu(page, 'Library');
+	await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
+});

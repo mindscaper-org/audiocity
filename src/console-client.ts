@@ -289,6 +289,12 @@ export const consoleClient = String.raw`'use strict';
 	document.querySelectorAll('[data-action]').forEach(button => on(button, 'click', async () => { menu.open = false; await actions[button.dataset.action](); }));
 	window.addEventListener('popstate', () => { route().catch(fail); });
 	window.addEventListener('beforeunload', event => { if (manageDrafts.size) { event.preventDefault(); event.returnValue = ''; } });
-	if (token()) api('/auth/me').then(async value => { session(value); await route(); }).catch(error => { clearSession(); login(); fail(error); });
-	else route().catch(fail);
+	async function start() {
+		if (token()) {
+			try { session(await api('/auth/me')); }
+			catch (error) { clearSession(); login(); fail(error); return; }
+		}
+		await route();
+	}
+	start().catch(fail);
 })();`;
