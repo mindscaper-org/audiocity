@@ -41,6 +41,7 @@ export function projectInfo(ctx: Context, project: ProjectRow) {
 		WHERE s.project_id=? AND s.synced>0 AND b.state='ready' AND b.mime!='application/octet-stream'
 		ORDER BY s.created DESC,s.rowid DESC LIMIT 1`, project.id);
 	const preview = previewSnapshot ? snapshotPreview(ctx, previewSnapshot) : null;
+	const format = head?.format ?? 'audacity';
 	return {
 		id: projectClientId(ctx, project), username: owner?.username ?? '', author_name: owner?.name ?? '',
 		slug: project.slug, name: project.name, details: project.details,
@@ -50,7 +51,7 @@ export function projectInfo(ctx: Context, project: ProjectRow) {
 		latest_synced_snapshot_id: project.synced_id,
 		latest_synced_format: synced?.format ?? '',
 		preview: preview ? { ...preview, is_current: previewSnapshot!.id === project.synced_id } : null,
-		format: head?.format ?? 'audacity', transport: head?.format === 'audacity' ? 'blocks' : 'file',
+		format, transport: format === 'audacity' ? 'blocks' : 'file',
 	};
 }
 

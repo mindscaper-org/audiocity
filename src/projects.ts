@@ -105,7 +105,7 @@ export async function registerProjectRoutes(app: FastifyInstance, ctx: Context):
 			ctx.db.run('DELETE FROM snapshots WHERE id=?', snapshot.id);
 			if (project.head_id === snapshot.id) {
 				const previousHead = snapshot.previous_head_id || project.synced_id;
-				if (previousHead) ctx.db.run('UPDATE projects SET head_id=?,updated=? WHERE id=?', previousHead, now(), project.id);
+				if (previousHead || snapshot.format === 'audacity') ctx.db.run('UPDATE projects SET head_id=?,updated=? WHERE id=?', previousHead, now(), project.id);
 				else ctx.db.run('DELETE FROM projects WHERE id=?', project.id);
 			}
 		});

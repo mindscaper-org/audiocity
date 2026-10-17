@@ -107,10 +107,11 @@ export function createSnapshot(ctx: Context, project: ProjectRow, form: ProjectF
 	if (!form.force && form.head !== project.head_id) throw new ApiError(409, 'The project head changed. Refresh before saving, or explicitly force a revision.', 'ProjectVersionConflict');
 	if (form.head && !ctx.db.get('SELECT id FROM snapshots WHERE id=? AND project_id=?', form.head, project.id)) throw new ApiError(409, 'The parent snapshot does not belong to this project.', 'ProjectVersionConflict');
 	const previous = project.head_id ? getSnapshot(ctx, project, project.head_id) : undefined;
-	const format = form.format ?? previous?.format ?? 'audacity';
+	const previousFormat = previous?.format ?? (ctx.db.get('SELECT 1 FROM native_project_ids WHERE project_id=?', project.id) ? 'audacity' : undefined);
+	const format = form.format ?? previousFormat ?? 'audacity';
 	if (format !== 'audacity' && form.hashes.length) throw new ApiError(422, 'Whole-file projects do not accept audio block hashes.', 'ValidationError');
-	if (previous && (format === 'audacity') !== (previous.format === 'audacity')) throw new ApiError(422, 'Create a separate project when switching between block snapshots and whole-file archives.', 'ValidationError');
-	if (!previous && format === 'audacity') ctx.db.run('INSERT INTO native_project_ids (project_id) VALUES (?)', project.id);
+	if (previousFormat && (format === 'audacity') !== (previousFormat === 'audacity')) throw new ApiError(422, 'Create a separate project when switching between block snapshots and whole-file archives.', 'ValidationError');
+	if (!previous && format === 'audacity') ctx.db.run('INSERT INTO native_project_ids (project_id) VALUES (?) ON CONFLICT(project_id) DO NOTHING', project.id);
 	const id = randomUUID(); const date = now();
 	const file = ctx.blobs.create(project.owner_id, {
 		kind: format === 'audacity' ? 'project-file' : 'project-archive', resourceId: id,

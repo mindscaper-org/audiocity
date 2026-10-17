@@ -148,7 +148,7 @@ await test('deleting active snapshots is guarded while deleting an abandoned hea
 	assert.equal((await f.app.inject({ url: root, headers: auth(f.token) })).statusCode, 404);
 });
 
-await test('deleting the only pending snapshot removes its empty project and retires its upload capabilities', async (t) => {
+await test('deleting the only pending snapshot retains native retry identity and retires its upload capabilities', async (t) => {
 	const f = await fixture(); t.after(() => f.cleanup());
 	let nativeId = '';
 	for (const format of ['audacity', 'aup4']) {
@@ -158,8 +158,12 @@ await test('deleting the only pending snapshot removes its empty project and ret
 		if (format === 'audacity') nativeId = created.project.id;
 		const root = `/project/${created.project.id}`;
 		assert.equal((await f.app.inject({ method: 'DELETE', url: `${root}/snapshot/${created.snapshot.id}`, headers: auth(f.token) })).statusCode, 204);
-		assert.equal((await f.app.inject({ url: root, headers: auth(f.token) })).statusCode, 404);
-		assert.equal((await f.app.inject({ method: 'POST', url: `${root}/snapshot`, headers: auth(f.token), payload: { blocks: [] } })).statusCode, 404);
+		const metadata = await f.app.inject({ url: root, headers: auth(f.token) });
+		assert.equal(metadata.statusCode, format === 'audacity' ? 200 : 404);
+		if (format === 'audacity') {
+			assert.equal(metadata.json<{ head: unknown }>().head, null);
+			assert.equal(metadata.json<{ transport: string }>().transport, 'blocks');
+		} else assert.equal((await f.app.inject({ method: 'POST', url: `${root}/snapshot`, headers: auth(f.token), payload: { blocks: [] } })).statusCode, 404);
 		const list = await f.app.inject({ url: '/project?transport=all', headers: auth(f.token) });
 		assert.deepEqual(list.json<Listed<Snapshot>>().items, []);
 		for (const descriptor of [created.sync.file, created.sync.mixdown, ...created.sync.blocks]) {
