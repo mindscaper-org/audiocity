@@ -119,8 +119,12 @@ deleting the audio immediately makes those URLs unavailable.
 
 `POST /audio` accepts Audacity's `name`, `mime`, `size`, `public`, and `method`
 fields. Its response additionally supplies `extra.audio` with `id`, `slug`, and
-`username`, and a `progress` capability URL accepting PATCH requests. Explicit
-`public: false` means unlisted, as with Audacity's original sharing flow.
+`username`, and a `progress` capability URL accepting PATCH requests. Native
+policies also include `extra.token`: Audacity cancels with
+`DELETE /audio/AUDIO_ID?token=TOKEN` without an OAuth header. This capability is
+scoped to that recording and expires with its upload URLs. Discarding removes
+pending or ready audio, retires in-flight uploads, and releases its storage quota.
+Explicit `public: false` means unlisted, as with Audacity's original sharing flow.
 
 `GET /my/audio` returns `items` and Audacity's pagination keys `total`, `pages`,
 `page`, and `size`. Each item supplies the required `author` string, `created`

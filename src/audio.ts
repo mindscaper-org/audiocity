@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ApiError, now, objectBody, pageQuery, requiredString } from './core.ts';
 import type { Context, User } from './core.ts';
@@ -125,10 +125,27 @@ export async function registerAudioRoutes(app: FastifyInstance, ctx: Context): P
 				row.description, row.tags, row.license, row.visibility, row.is_downloadable, row.duration, row.created, row.updated);
 		} catch (error) { await ctx.blobs.remove(policy.id); throw error; }
 		const audio = metadata(row, false, user, request.routeOptions.url === '/v1/audio/create');
-		return { ...policy, audio, extra: { audio } };
+		return { ...policy, audio, extra: { audio, ...(request.routeOptions.url === '/audio' ? { token: new URL(policy.url).searchParams.get('token')! } : {}) } };
 	}
 
 	for (const url of ['/v1/audio/create', '/audio']) app.post(url, async (request, reply) => reply.code(201).send(await create(request)));
+	app.delete<{ Params: { id: string } }>('/audio/:id', async (request, reply) => {
+		const token = objectBody(request.query).token;
+		const row = ctx.db.get<{ id: string; blob_id: string; capability_hash: string; expires: number }>(`SELECT a.id,a.blob_id,b.capability_hash,b.expires
+			FROM audio a JOIN blobs b ON b.id=a.blob_id WHERE a.id=? AND a.origin='upload' AND b.kind='audio' AND b.resource_id=a.id`, request.params.id);
+		const supplied = typeof token === 'string' ? createHash('sha256').update(token).digest() : Buffer.alloc(0);
+		const expected = row ? Buffer.from(row.capability_hash, 'hex') : Buffer.alloc(0);
+		if (!row || typeof token !== 'string' || row.expires < now() || expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
+			throw new ApiError(403, 'Invalid or expired audio discard capability.', 'Forbidden');
+		}
+		ctx.db.transaction(() => {
+			// Retire the transfer before awaiting removal so an in-flight PUT cannot publish it.
+			ctx.db.run("UPDATE blobs SET state='failed',size=0 WHERE id=?", row.blob_id);
+			ctx.db.run('DELETE FROM audio WHERE id=?', row.id);
+		});
+		await ctx.blobs.remove(row.blob_id);
+		return reply.code(204).send();
+	});
 
 	app.get('/v1/search', { config: { rateLimit: {
 		max: 60, timeWindow: '1 minute', keyGenerator: request => owner(request).id,
