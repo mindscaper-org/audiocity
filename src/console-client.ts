@@ -12,6 +12,7 @@ export const consoleClient = String.raw`'use strict';
 	const players = new Set();
 	let libraryTab = 'audio';
 	let optionsPromise;
+	let viewGeneration = 0;
 	function stopPlayers() { for (const player of players) player.dispose(); players.clear(); }
 	async function player(container, data) {
 		const { attachAudioPlayer } = await import('/playback.js');
@@ -38,7 +39,7 @@ export const consoleClient = String.raw`'use strict';
 		});
 	}
 	function begin(title) {
-		stopPlayers(); document.title = title + ' · Audiocity'; tell('');
+		viewGeneration++; stopPlayers(); document.title = title + ' · Audiocity'; tell('');
 		const heading = node('h1', title);
 		heading.id = 'view-title';
 		workspace.replaceChildren(heading);
@@ -168,8 +169,8 @@ export const consoleClient = String.raw`'use strict';
 		workspace.append(form);
 	}
 	async function projectList(page = 1) {
-		requireSession(); const accountId = user.id; const result = await api('/project?transport=all&per-page=20&page=' + page);
-		if (user?.id !== accountId) return;
+		requireSession(); const accountId = user.id; const view = ++viewGeneration; const result = await api('/project?transport=all&per-page=20&page=' + page);
+		if (view !== viewGeneration || user?.id !== accountId) return;
 		const panel = libraryFrame('projects');
 		if (!result.items.length) panel.append(node('p', 'No projects on this page. Use + Upload to add an AUP3 or AUP4 archive.'));
 		for (const project of result.items) {
@@ -195,8 +196,8 @@ export const consoleClient = String.raw`'use strict';
 		await player(container, { url: safeUrl(fresh.preview.url), mime: fresh.preview.mime, name: project.name });
 	}
 	async function revisions(project, page = 1) {
-		requireSession(); const accountId = user.id; const result = await api('/project/' + encodeURIComponent(project.id) + '/snapshot?per-page=20&page=' + page);
-		if (user?.id !== accountId) return;
+		requireSession(); const accountId = user.id; const view = ++viewGeneration; const result = await api('/project/' + encodeURIComponent(project.id) + '/snapshot?per-page=20&page=' + page);
+		if (view !== viewGeneration || user?.id !== accountId) return;
 		begin('Revisions: ' + project.name);
 		for (const revision of result.items) {
 			const date = new Date(revision.date_created * 1000).toLocaleString();
@@ -261,6 +262,7 @@ export const consoleClient = String.raw`'use strict';
 		await route();
 	}
 	async function route() {
+		viewGeneration++;
 		const path = location.pathname;
 		const audio = path.match(/^\/audio\/([^/]+)\/(play|edit)$/);
 		const slug = path.match(/^\/([^/]+)\/audio\/([^/]+)(\/edit)?$/);
@@ -270,8 +272,10 @@ export const consoleClient = String.raw`'use strict';
 		if (!user) { if (path !== '/' || new URLSearchParams(location.search).has('view')) login(); return; }
 		if (audio) { await editAudioPage({ id: decodeURIComponent(audio[1]) }); return; }
 		if (slug) {
-			try { await editAudioPage({ username: decodeURIComponent(slug[1]), slug: decodeURIComponent(slug[2]) }); }
-			catch (error) { await audioList(); tell(error.message, true); }
+			const pending = editAudioPage({ username: decodeURIComponent(slug[1]), slug: decodeURIComponent(slug[2]) });
+			const view = viewGeneration; const requestedUrl = location.href;
+			try { await pending; }
+			catch (error) { if (view !== viewGeneration) return; await audioList(); if (location.href === requestedUrl) tell(error.message, true); }
 			return;
 		}
 		if (path === '/account/new') { createAccount(); return; }

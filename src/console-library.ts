@@ -43,12 +43,12 @@ export const consoleLibrary = String.raw`
 	}
 	function editable(item) { return item.can_edit === true || item.can_edit === undefined && user && item.author && item.author.id === user.id; }
 	async function audioList(page = 1) {
-		requireSession(); const accountId = user.id;
+		requireSession(); const accountId = user.id; const view = ++viewGeneration;
 		const preference = await api('/library/preferences');
-		if (user?.id !== accountId) return;
+		if (view !== viewGeneration || user?.id !== accountId) return;
 		if (!audioSource) audioSource = preference.include_shared ? 'all' : 'mine';
 		const result = await api('/library/audio?' + new URLSearchParams({ source: audioSource, page, 'per-page': 20, q: audioQuery }));
-		if (user?.id !== accountId) return;
+		if (view !== viewGeneration || user?.id !== accountId) return;
 		const panel = libraryFrame('audio');
 		const toolbar = node('div'); toolbar.className = 'toolbar';
 		const source = select(toolbar, 'Files', [['mine', 'My uploads'], ['shared', 'Shared library'], ['all', 'My uploads + shared library']], audioSource);
@@ -88,17 +88,19 @@ export const consoleLibrary = String.raw`
 		return details;
 	}
 	async function playAudio(locator) {
-		const accountToken = token(); const requestedPath = location.pathname; const item = await getAudio(locator);
-		if (token() !== accountToken || location.pathname !== requestedPath) return;
+		const accountToken = token(); let view = ++viewGeneration; const item = await getAudio(locator);
+		if (token() !== accountToken || view !== viewGeneration) return;
 		begin(item.title); document.title = item.title + ' · Audiocity';
+		view = viewGeneration;
 		if (user) { const crumbs = node('p'); crumbs.className = 'breadcrumbs'; crumbs.append(link('← Library', '/library?tab=audio')); workspace.append(crumbs); }
 		const container = node('div'); workspace.append(container);
 		if (item.status === 'ready' && item.play.url) await player(container, { url: safeUrl(item.play.url), mime: item.source.mime, name: item.title });
 		else container.append(node('p', 'This audio is not ready for playback.'));
+		if (token() !== accountToken || view !== viewGeneration) return;
 		if (item.description) { const description = node('p', item.description); description.className = 'description'; workspace.append(description); }
 		if (item.tags?.length) { const tags = node('p'); tags.className = 'tags'; for (const tag of item.tags) { const pill = node('span', tag); pill.className = 'tag'; tags.append(pill); } workspace.append(tags); }
 		const options = await libraryOptions();
-		if (token() !== accountToken || location.pathname !== requestedPath) return;
+		if (token() !== accountToken || view !== viewGeneration) return;
 		workspace.append(metadataList(item, options));
 		const toolbar = node('div'); toolbar.className = 'toolbar';
 		if (editable(item)) toolbar.append(link('Edit details', '/audio/' + encodeURIComponent(item.id) + '/edit'));
@@ -110,9 +112,9 @@ export const consoleLibrary = String.raw`
 		workspace.append(toolbar);
 	}
 	async function editAudioPage(locator) {
-		requireSession(); const accountId = user.id;
+		requireSession(); const accountId = user.id; const view = ++viewGeneration;
 		const [item, options] = await Promise.all([getAudio(locator), libraryOptions()]);
-		if (user?.id !== accountId) return;
+		if (view !== viewGeneration || user?.id !== accountId) return;
 		if (!editable(item)) throw new Error('You cannot edit this audio.');
 		history.replaceState(null, '', '/audio/' + encodeURIComponent(item.id) + '/edit');
 		begin('Edit: ' + item.title); const crumbs = node('p'); crumbs.className = 'breadcrumbs'; crumbs.append(link('← Playback page', audioPlaybackPath(item))); workspace.append(crumbs);
@@ -139,7 +141,7 @@ export const consoleLibrary = String.raw`
 		const cancel = link('Cancel', audioPlaybackPath(item)); form.append(cancel); workspace.append(form);
 	}
 	async function uploadFiles() {
-		requireSession(); const accountId = user.id; const options = await libraryOptions(); if (user?.id !== accountId) return; begin('Upload files');
+		requireSession(); const accountId = user.id; const view = ++viewGeneration; const options = await libraryOptions(); if (view !== viewGeneration || user?.id !== accountId) return; begin('Upload files');
 		workspace.append(node('p', 'Choose audio files or closed AUP3/AUP4 projects. Audio goes into the Audio tab; projects go into Projects. Originals are preserved.'));
 		const form = node('form'); const files = field(form, 'Audio or project files', 'file'); files.multiple = true; files.accept = 'audio/*,.wv,.wav,.wave,.mp3,.flac,.aif,.aiff,.aifc,.ogg,.oga,.opus,.m4a,.mp4,.webm,.weba,.aac,.aup3,.aup4'; files.required = true;
 		const title = field(form, 'Title (single file, optional)'); title.maxLength = 256;

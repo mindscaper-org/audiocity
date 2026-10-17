@@ -171,6 +171,31 @@ test('opening a missing recording keeps the authenticated session', async ({ pag
 	await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
 });
 
+test('a delayed library response cannot replace the upload page after navigation', async ({ page, request }) => {
+	const token = await grant(request);
+	let release!: () => void;
+	let arrived!: () => void;
+	const blocked = new Promise<void>(resolve => { release = resolve; });
+	const started = new Promise<void>(resolve => { arrived = resolve; });
+	await page.route('**/library/audio?*', async route => {
+		const response = await route.fetch();
+		arrived(); await blocked; await route.fulfill({ response });
+	});
+	try {
+		await signedIn(page, token);
+		await started;
+		await page.getByRole('button', { name: '+ Upload', exact: true }).click();
+		await expect(page.getByRole('heading', { name: 'Upload files', exact: true })).toBeVisible();
+		const finished = page.waitForResponse(response => new URL(response.url()).pathname === '/library/audio');
+		release(); await (await finished).finished();
+		// Wait for the browser to consume the released response and render its continuation.
+		await page.evaluate(() => new Promise<void>(resolve => { requestAnimationFrame(() => { requestAnimationFrame(() => { resolve(); }); }); }));
+		await expect(page).toHaveURL(/\/upload$/);
+		await expect(page.getByRole('heading', { name: 'Upload files', exact: true })).toBeVisible();
+		await expect(page.getByLabel('Audio or project files', { exact: true })).toBeVisible();
+	} finally { release(); }
+});
+
 test('upload options recover after a temporary server error', async ({ page, request }) => {
 	const token = await grant(request);
 	await signedIn(page, token);

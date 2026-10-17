@@ -183,8 +183,8 @@ export const consoleManage = String.raw`
 		manageHasNext = managePage < result.pagination.pages;
 	}
 	async function manageFiles(refresh = true) {
-		requireSession(); const accountId = user.id; const options = await libraryOptions(); if (!managePage) await loadManagePage(); else if (refresh) await refreshManageRows();
-		if (user?.id !== accountId) return;
+		requireSession(); const accountId = user.id; const view = ++viewGeneration; const options = await libraryOptions(); if (!managePage) await loadManagePage(); else if (refresh) await refreshManageRows();
+		if (view !== viewGeneration || user?.id !== accountId) return;
 		begin('Manage files');
 		workspace.append(node('p', 'Edit audio metadata in a table. Shared files show read-only fields unless you have permission to edit them. Project revisions remain in Library → Projects.'));
 		const instructions = node('p', 'Click a cell, Shift-click or Shift+arrow to select a range. Arrow keys and Tab move. Enter/F2 or typing edits; Ctrl+Enter fills the selection. Shift+Enter inserts a line in descriptions. Copy/paste spreadsheet cells with Ctrl+C / Ctrl+V. Delete clears; Ctrl+D fills down, Ctrl+R fills right, Ctrl+Z undoes. Save changes applies every edited file together.'); instructions.id = 'grid-help'; instructions.className = 'hint'; workspace.append(instructions);
@@ -227,12 +227,14 @@ export const consoleManage = String.raw`
 			const list = node('datalist'); list.id = 'grid-options-' + key;
 			for (const [id, name] of choices) { const option = node('option', name); option.value = id; list.append(option); } workspace.append(list);
 		}
-		if (manageHasNext) { const more = node('button', 'Load more files'); on(more, 'click', async () => { more.disabled = true; try { await loadManagePage(); await manageFiles(false); } finally { more.disabled = false; } }); workspace.append(more); }
+		if (manageHasNext) { const more = node('button', 'Load more files'); on(more, 'click', async () => { const view = viewGeneration; more.disabled = true; try { await loadManagePage(); if (view === viewGeneration && more.isConnected) await manageFiles(false); } finally { more.disabled = false; } }); workspace.append(more); }
 		refreshGrid();
 	}
 	async function manageCategories() {
 		requireSession(); if (!user.admin) throw new Error('Administrator access is required.');
-		optionsPromise = undefined; const options = await libraryOptions(); begin('Categories');
+		const accountId = user.id; const view = ++viewGeneration; optionsPromise = undefined; const options = await libraryOptions();
+		if (view !== viewGeneration || user?.id !== accountId) return;
+		begin('Categories');
 		workspace.append(node('p', 'Categories are shared by all users. IDs are stable labels used by Audacity and spreadsheet imports. Categories in use must be reassigned before they can be deleted.'));
 		const wrap = node('div'); wrap.className = 'table-wrap'; const table = node('table'); table.className = 'category-table'; const head = node('thead'); const headers = node('tr'); for (const text of ['ID', 'Name', 'Actions']) headers.append(node('th', text)); head.append(headers); table.append(head); const body = node('tbody');
 		for (const entry of options.categories) {
