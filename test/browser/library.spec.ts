@@ -170,3 +170,15 @@ test('opening a missing recording keeps the authenticated session', async ({ pag
 	await menu(page, 'Library');
 	await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
 });
+
+test('upload options recover after a temporary server error', async ({ page, request }) => {
+	const token = await grant(request);
+	await signedIn(page, token);
+	await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
+	await page.route('**/library/options', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Options temporarily unavailable.' }) }), { times: 1 });
+	await page.getByRole('button', { name: '+ Upload', exact: true }).click();
+	await expect(page.locator('#message')).toContainText('Options temporarily unavailable.');
+	await page.getByRole('button', { name: '+ Upload', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'Upload files', exact: true })).toBeVisible();
+	await expect(page.getByLabel('Audio category', { exact: true })).toHaveValue('recording');
+});

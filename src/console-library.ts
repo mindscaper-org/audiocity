@@ -5,7 +5,13 @@ export const consoleLibrary = String.raw`
 	const defaultCategories = [['music', 'Music'], ['podcast', 'Podcast'], ['voiceover', 'Voiceover'], ['sfx', 'SFX'], ['cover', 'Cover'], ['beats', 'Beats'], ['audiobook', 'Audiobook'], ['recording', 'Recording'], ['other', 'Other']];
 	let audioSource;
 	let audioQuery = '';
-	async function libraryOptions() { return optionsPromise ||= api('/library/options'); }
+	async function libraryOptions() {
+		if (!optionsPromise) {
+			const pending = api('/library/options'); optionsPromise = pending;
+			pending.catch(() => { if (optionsPromise === pending) optionsPromise = undefined; });
+		}
+		return optionsPromise;
+	}
 	function optionPairs(options) { return options.map(option => [option.id, option.name]); }
 	function libraryFrame(tab) {
 		libraryTab = tab; begin('Library');
