@@ -139,7 +139,9 @@ export function descriptor(value: string): UploadDescriptor {
 export async function collectUnusedBlocks(ctx: Context, owner: string): Promise<void> {
 	const unused = ctx.db.all<BlockRow>('SELECT * FROM project_blocks b WHERE owner_id=? AND NOT EXISTS (SELECT 1 FROM snapshot_blocks s WHERE s.owner_id=b.owner_id AND s.hash=b.hash)', owner);
 	for (const row of unused) {
-		ctx.db.run('DELETE FROM project_blocks WHERE owner_id=? AND hash=?', owner, row.hash);
-		await ctx.blobs.remove(row.blob_id);
+		// A save may reuse another candidate while the previous removal awaits I/O.
+		const removed = ctx.db.run(`DELETE FROM project_blocks WHERE owner_id=? AND hash=? AND blob_id=?
+			AND NOT EXISTS (SELECT 1 FROM snapshot_blocks s WHERE s.owner_id=project_blocks.owner_id AND s.hash=project_blocks.hash)`, owner, row.hash, row.blob_id);
+		if (Number(removed.changes) === 1) await ctx.blobs.remove(row.blob_id);
 	}
 }
