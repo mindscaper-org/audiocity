@@ -39,7 +39,7 @@ export async function registerProjectRoutes(app: FastifyInstance, ctx: Context):
 		const result = ctx.db.transaction(() => {
 			const project = createProject(ctx, user, form);
 			const snapshot = createSnapshot(ctx, project, { ...form, head: '', force: false });
-			return { project: projectInfo(ctx, getProject(ctx, user, project.id)), snapshot: snapshotInfo(ctx, snapshot), sync: syncState(ctx, project, snapshot) };
+			return { project: projectInfo(ctx, getProject(ctx, user, project.id)), snapshot: snapshotInfo(ctx, snapshot), sync: syncState(ctx, project, snapshot, true) };
 		});
 		return reply.code(result.snapshot.transport === 'blocks' ? 200 : 201).send(result);
 	});
@@ -72,7 +72,7 @@ export async function registerProjectRoutes(app: FastifyInstance, ctx: Context):
 		const form = projectForm(objectBody(request.body));
 		const result = ctx.db.transaction(() => {
 			const snapshot = createSnapshot(ctx, project, form);
-			return { project: projectInfo(ctx, getProject(ctx, user, project.id)), snapshot: snapshotInfo(ctx, snapshot), sync: syncState(ctx, project, snapshot) };
+			return { project: projectInfo(ctx, getProject(ctx, user, project.id)), snapshot: snapshotInfo(ctx, snapshot), sync: syncState(ctx, project, snapshot, true) };
 		});
 		return reply.code(result.snapshot.transport === 'blocks' ? 200 : 201).send(result);
 	});

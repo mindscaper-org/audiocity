@@ -89,6 +89,30 @@ await test('GET sync resumes only missing blocks and stale completion never repl
 	assert.equal(info.json<Created['project']>().latest_synced_snapshot_id, newer.snapshot.id);
 });
 
+await test('new saves renew expired or cancelled block uploads reused from earlier snapshots', async (t) => {
+	const f = await fixture(); t.after(() => f.cleanup());
+	const create = async (url: string, payload: object) => {
+		const response = await f.app.inject({ method: 'POST', url, headers: auth(f.token), payload });
+		assert.equal(response.statusCode, 200, response.body);
+		return response.json<Created>();
+	};
+	const first = await create('/project', { name: 'Interrupted save', blocks: ['expired', 'cancelled'] });
+	const expired = first.sync.blocks.find(block => block.id === 'expired')!;
+	const cancelled = first.sync.blocks.find(block => block.id === 'cancelled')!;
+	f.ctx.db.run('UPDATE blobs SET expires=1 WHERE id=?', new URL(expired.url).pathname.split('/').pop()!);
+	assert.equal((await f.app.inject({ method: 'POST', url: path(cancelled.fail) })).statusCode, 200);
+
+	const second = await create(`/project/${first.project.id}/snapshot`, { head_snapshot_id: first.snapshot.id, blocks: ['expired', 'cancelled'] });
+	assert.equal((await complete(f, second)).statusCode, 204);
+	const historical = await f.app.inject({ url: `/project/${first.project.id}/snapshot/${first.snapshot.id}`, headers: auth(f.token) });
+	assert.equal(historical.json<Snapshot>().blocks.length, 2, 'shared block references retain the recovered uploads');
+
+	const abandoned = await create('/project', { name: 'Abandoned project', blocks: ['shared-cancelled'] });
+	assert.equal((await f.app.inject({ method: 'POST', url: path(abandoned.sync.blocks[0]!.fail) })).statusCode, 200);
+	const fresh = await create('/project', { name: 'New project', blocks: ['shared-cancelled'] });
+	assert.equal((await complete(f, fresh)).statusCode, 204);
+});
+
 await test('whole AUP3 and AUP4 archives use explicit transport and retain revision downloads', async (t) => {
 	const f = await fixture(); t.after(() => f.cleanup());
 	const response = await f.app.inject({ method: 'POST', url: '/project', headers: auth(f.token), payload: { name: 'Archive', format: 'aup3', size: 17 } });
